@@ -1,0 +1,810 @@
+/**
+ * Assistant chat chrome (design §3.2 `theme.css`, review G-9). This SPA is a
+ * separate Vite build from the widgets (`vite.assistant.config.ts` roots at
+ * `ui/assistant`, not `ui/`), so it cannot `@import "../shared/theme.css"`
+ * across that build boundary without pulling widget-only rules (`.viz-*`)
+ * into the host shell. Instead this file duplicates the *token names* from
+ * `ui/shared/theme.css`'s `:root` block (kept unmodified) so the same palette
+ * — and the same `prefers-color-scheme` / `data-theme` toggle convention —
+ * applies to both the host chrome and, independently, every widget iframe.
+ */
+:root {
+  color-scheme: light;
+  --surface-1: #fcfcfb;
+  --surface-2: #ffffff;
+  --text-primary: #0b0b0b;
+  --text-secondary: #52514e;
+  --text-muted: #898781;
+  --gridline: #e1e0d9;
+  --baseline: #c3c2b7;
+  --border: rgba(11, 11, 11, 0.1);
+  --success: #006300;
+  --danger: #b3261e;
+  --warn: #8a5a00;
+
+  --series-1: #2a78d6;
+  --series-2: #eb6834;
+  --series-3: #1baf7a;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root:where(:not([data-theme="light"])) {
+    color-scheme: dark;
+    --surface-1: #1a1a19;
+    --surface-2: #232322;
+    --text-primary: #ffffff;
+    --text-secondary: #c3c2b7;
+    --text-muted: #898781;
+    --gridline: #2c2c2a;
+    --baseline: #383835;
+    --border: rgba(255, 255, 255, 0.1);
+    --success: #0ca30c;
+    --danger: #ff6b60;
+    --warn: #e0a942;
+
+    --series-1: #3987e5;
+    --series-2: #d95926;
+    --series-3: #199e70;
+  }
+}
+
+:root[data-theme="dark"] {
+  color-scheme: dark;
+  --surface-1: #1a1a19;
+  --surface-2: #232322;
+  --text-primary: #ffffff;
+  --text-secondary: #c3c2b7;
+  --text-muted: #898781;
+  --gridline: #2c2c2a;
+  --baseline: #383835;
+  --border: rgba(255, 255, 255, 0.1);
+  --success: #0ca30c;
+  --danger: #ff6b60;
+  --warn: #e0a942;
+
+  --series-1: #3987e5;
+  --series-2: #d95926;
+  --series-3: #199e70;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html,
+body,
+#root {
+  height: 100%;
+  /* The app is a fixed single-viewport shell — only .assistant-transcript
+     ever scrolls. Without this, if any descendant briefly grows taller than
+     its allotted flex space (a widget iframe resizing, a burst of streamed
+     text), the *page* becomes the scroll container instead of the transcript
+     pane — and then auto-scroll-to-bottom (Transcript.tsx) scrolls the whole
+     page on every streamed token, dragging the composer along with it. This
+     rules that failure mode out at the root instead of chasing every place
+     content could grow. */
+  overflow: hidden;
+}
+
+body {
+  margin: 0;
+  font-family: system-ui, -apple-system, "Segoe UI", sans-serif;
+  background: var(--surface-1);
+  color: var(--text-primary);
+}
+
+button {
+  font: inherit;
+}
+
+a {
+  color: var(--series-1);
+}
+
+.assistant-shell {
+  display: flex;
+  flex-direction: column;
+  height: 100vh;
+}
+
+.assistant-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 10px 16px;
+  border-bottom: 1px solid var(--border);
+  background: var(--surface-2);
+}
+
+.assistant-header h1 {
+  font-size: 15px;
+  font-weight: 600;
+  margin: 0;
+}
+
+.assistant-panel-toggle {
+  appearance: none;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: transparent;
+  color: var(--text-primary);
+  padding: 6px 12px;
+  cursor: pointer;
+}
+
+.assistant-build-warning {
+  background: rgba(138, 90, 0, 0.12);
+  color: var(--warn);
+  padding: 8px 16px;
+  font-size: 12px;
+  border-bottom: 1px solid var(--border);
+}
+
+.assistant-body {
+  flex: 1;
+  display: flex;
+  min-height: 0;
+  position: relative;
+}
+
+/* One chat column — text and widgets scroll together in Transcript.tsx (see
+   ToolResultCard.tsx). Only .assistant-main's own children scroll, never the
+   page itself. The MCP-servers drawer (.assistant-sidebar) overlays this
+   instead of splitting it into a second column, so the chat is never
+   squeezed and never has to share the screen with anything else. */
+.assistant-main {
+  flex: 1 1 auto;
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  min-height: 0;
+}
+
+.assistant-sidebar-backdrop {
+  position: absolute;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.25);
+  z-index: 5;
+}
+
+.assistant-sidebar {
+  position: absolute;
+  top: 0;
+  right: 0;
+  bottom: 0;
+  width: 340px;
+  max-width: 90vw;
+  flex: none;
+  border-left: 1px solid var(--border);
+  background: var(--surface-2);
+  overflow-y: auto;
+  padding: 16px;
+  box-shadow: -8px 0 24px rgba(0, 0, 0, 0.12);
+  z-index: 6;
+  animation: assistant-drawer-in 160ms ease-out;
+}
+
+@keyframes assistant-drawer-in {
+  from {
+    transform: translateX(16px);
+    opacity: 0;
+  }
+  to {
+    transform: translateX(0);
+    opacity: 1;
+  }
+}
+
+.assistant-panel-section {
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  margin-bottom: 12px;
+  background: var(--surface-1);
+}
+
+.assistant-panel-section:last-child {
+  margin-bottom: 0;
+}
+
+.assistant-panel-section-title {
+  cursor: pointer;
+  list-style: none;
+  font-size: 13px;
+  font-weight: 600;
+  padding: 10px 12px;
+}
+
+.assistant-panel-section-title::-webkit-details-marker {
+  display: none;
+}
+
+.assistant-panel-section-title::before {
+  content: "▸";
+  display: inline-block;
+  margin-right: 6px;
+  transition: transform 120ms;
+}
+
+.assistant-panel-section[open] > .assistant-panel-section-title::before {
+  transform: rotate(90deg);
+}
+
+.assistant-panel-section-body {
+  padding: 0 12px 12px;
+}
+
+.assistant-transcript {
+  flex: 1;
+  /* Flex items default to min-height:auto, i.e. "at least as tall as my
+     content" — which defeats overflow-y:auto and lets this grow past
+     .assistant-main's bounds instead of scrolling internally. Explicit 0
+     overrides that. */
+  min-height: 0;
+  overflow-y: auto;
+  overflow-x: hidden;
+  padding: 24px 16px 8px;
+  scroll-behavior: smooth;
+}
+
+.assistant-empty-state {
+  color: var(--text-secondary);
+  font-size: 14px;
+  padding: 48px 0 24px;
+  text-align: center;
+  max-width: 640px;
+  margin: 0 auto;
+}
+
+.assistant-suggestions {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 8px;
+  margin-top: 16px;
+}
+
+.assistant-suggestion-chip {
+  appearance: none;
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  background: var(--surface-2);
+  color: var(--text-primary);
+  padding: 8px 14px;
+  font-size: 13px;
+  cursor: pointer;
+  transition: border-color 120ms, transform 120ms;
+}
+
+.assistant-suggestion-chip:hover {
+  border-color: var(--series-1);
+  transform: translateY(-1px);
+}
+
+.assistant-transcript-list {
+  list-style: none;
+  margin: 0 auto;
+  padding: 0;
+  max-width: 760px;
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+}
+
+.assistant-item {
+  display: flex;
+}
+
+.assistant-item-user {
+  justify-content: flex-end;
+}
+
+.assistant-bubble {
+  max-width: 640px;
+  padding: 10px 16px;
+  border-radius: 18px;
+  font-size: 15px;
+  line-height: 1.55;
+}
+
+.assistant-bubble p:first-child {
+  margin-top: 0;
+}
+
+.assistant-bubble p:last-child {
+  margin-bottom: 0;
+}
+
+.assistant-bubble-user {
+  background: var(--series-1);
+  color: white;
+  border-bottom-right-radius: 6px;
+}
+
+.assistant-bubble-user.assistant-bubble-app {
+  background: var(--series-3);
+}
+
+.assistant-bubble-label {
+  font-size: 10px;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  opacity: 0.8;
+  margin-bottom: 2px;
+}
+
+.assistant-bubble-assistant {
+  background: var(--surface-2);
+  border: 1px solid var(--border);
+  border-bottom-left-radius: 6px;
+  width: 100%;
+}
+
+.assistant-item-assistant_text {
+  justify-content: flex-start;
+}
+
+.assistant-item-tool_call {
+  justify-content: flex-start;
+}
+
+.assistant-cursor {
+  display: inline-block;
+  width: 6px;
+  height: 14px;
+  margin-left: 2px;
+  background: var(--text-secondary);
+  vertical-align: text-bottom;
+  animation: assistant-blink 1s steps(1) infinite;
+}
+
+@keyframes assistant-blink {
+  50% {
+    opacity: 0;
+  }
+}
+
+.assistant-markdown table {
+  border-collapse: collapse;
+  width: 100%;
+  font-size: 13px;
+  margin: 8px 0;
+}
+
+.assistant-markdown th,
+.assistant-markdown td {
+  border: 1px solid var(--gridline);
+  padding: 4px 8px;
+  text-align: left;
+}
+
+.assistant-markdown ul {
+  margin: 6px 0;
+  padding-left: 20px;
+}
+
+/* The tool-call card: status, an optional approval prompt, the chart (inline
+   — see ToolResultCard.tsx), and the underlying text/table. Same bubble
+   language as the assistant's text messages (rounded, surface-2, left-
+   anchored) so it reads as part of the same answer, not a separate widget. */
+.assistant-tool-card {
+  width: 100%;
+  /* Wider than a text bubble (640px) — a chart needs the room a sentence
+     doesn't, and 760px is the full transcript column's own width, so this
+     is the most space a card can use without widening the page. */
+  max-width: 760px;
+  border: 1px solid var(--border);
+  border-radius: 18px;
+  border-bottom-left-radius: 6px;
+  background: var(--surface-2);
+  padding: 14px 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.assistant-tool-status {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 11px;
+  color: var(--text-muted);
+  flex-wrap: wrap;
+}
+
+.assistant-tool-status-chip {
+  background: var(--surface-1);
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  padding: 2px 9px;
+}
+
+.assistant-tool-status-cancelled {
+  color: var(--danger);
+  font-weight: 600;
+}
+
+/* --- Inline widget: the chart lives right in the card, not a side pane --- */
+
+.assistant-tool-widget {
+  position: relative;
+}
+
+.assistant-widget-frame {
+  border-radius: 12px;
+  overflow: hidden;
+  border: 1px solid var(--gridline);
+  background: var(--surface-1);
+}
+
+.assistant-widget-frame-loading {
+  min-height: 160px;
+}
+
+.assistant-widget-loading {
+  font-size: 12px;
+  color: var(--text-muted);
+  padding: 4px 0;
+}
+
+.assistant-tool-details {
+  font-size: 13px;
+}
+
+.assistant-tool-details summary {
+  cursor: pointer;
+  color: var(--text-secondary);
+  font-size: 12px;
+  font-weight: 600;
+  user-select: none;
+}
+
+.assistant-tool-details summary::-webkit-details-marker {
+  display: none;
+}
+
+.assistant-tool-details summary::before {
+  content: "▸";
+  display: inline-block;
+  width: 12px;
+}
+
+.assistant-tool-details[open] summary::before {
+  content: "▾";
+}
+
+.assistant-tool-details .assistant-text-summary-body {
+  margin-top: 8px;
+}
+
+.assistant-approval {
+  border: 1px solid var(--warn);
+  border-radius: 10px;
+  padding: 10px 12px;
+  background: rgba(138, 90, 0, 0.08);
+  font-size: 13px;
+}
+
+.assistant-approval-actions {
+  display: flex;
+  gap: 8px;
+  margin-top: 6px;
+  flex-wrap: wrap;
+}
+
+.assistant-approval-actions button {
+  appearance: none;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  background: var(--surface-2);
+  color: var(--text-primary);
+  padding: 5px 10px;
+  cursor: pointer;
+}
+
+.assistant-approval-deny {
+  color: var(--danger);
+}
+
+.assistant-notice {
+  font-size: 12px;
+  padding: 6px 10px;
+  border-radius: 8px;
+}
+
+.assistant-notice-info {
+  background: rgba(42, 120, 214, 0.1);
+  color: var(--text-secondary);
+}
+
+.assistant-notice-warn {
+  background: rgba(138, 90, 0, 0.12);
+  color: var(--warn);
+}
+
+.assistant-retry-widget {
+  appearance: none;
+  border: 1px solid var(--warn);
+  border-radius: 6px;
+  background: transparent;
+  color: var(--warn);
+  padding: 2px 8px;
+  cursor: pointer;
+  font-size: 11px;
+}
+
+.assistant-error-row {
+  display: flex;
+  gap: 8px;
+  align-items: baseline;
+  font-size: 13px;
+  color: var(--danger);
+  border: 1px solid var(--danger);
+  border-radius: 8px;
+  padding: 8px 12px;
+  background: rgba(179, 38, 30, 0.06);
+}
+
+.assistant-error-code {
+  font-weight: 600;
+  text-transform: uppercase;
+  font-size: 10px;
+  letter-spacing: 0.03em;
+}
+
+.assistant-text-summary-body {
+  font-size: 13px;
+}
+
+.assistant-live-status {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  white-space: nowrap;
+}
+
+.assistant-composer {
+  flex: none;
+  padding: 12px 16px 20px;
+  background: var(--surface-1);
+}
+
+/* A floating rounded pill matching the transcript column's width, the way
+   ChatGPT/Claude anchor the input at the bottom of the chat rather than
+   spanning the full window edge to edge. */
+.assistant-composer-inner {
+  max-width: 760px;
+  margin: 0 auto;
+  display: flex;
+  gap: 8px;
+  align-items: flex-end;
+  border: 1px solid var(--border);
+  border-radius: 24px;
+  background: var(--surface-2);
+  padding: 8px 8px 8px 18px;
+  box-shadow: 0 2px 12px rgba(0, 0, 0, 0.05);
+}
+
+.assistant-composer-inner:focus-within {
+  border-color: var(--series-1);
+}
+
+.assistant-composer-input {
+  flex: 1;
+  resize: none;
+  min-height: 24px;
+  max-height: 200px;
+  border: none;
+  padding: 8px 0;
+  font: inherit;
+  font-size: 15px;
+  background: transparent;
+  color: var(--text-primary);
+}
+
+.assistant-composer-input:focus {
+  outline: none;
+}
+
+.assistant-composer-actions button {
+  appearance: none;
+  border: none;
+  border-radius: 999px;
+  padding: 10px 18px;
+  cursor: pointer;
+  font-weight: 600;
+}
+
+.assistant-send-button {
+  background: var(--series-1);
+  color: white;
+}
+
+.assistant-send-button:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
+.assistant-stop-button {
+  background: var(--danger);
+  color: white;
+}
+
+.assistant-composer-hint {
+  max-width: 760px;
+  margin: 6px auto 0;
+  font-size: 11px;
+  color: var(--text-muted);
+  text-align: center;
+}
+
+.assistant-servers-panel h2 {
+  font-size: 14px;
+  margin: 0 0 8px;
+}
+
+.assistant-servers-panel h3 {
+  font-size: 12px;
+  margin: 0 0 6px;
+  color: var(--text-secondary);
+}
+
+.assistant-servers-header {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+}
+
+.assistant-servers-list {
+  list-style: none;
+  margin: 0 0 16px;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.assistant-server-row {
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 8px 10px;
+  font-size: 12px;
+}
+
+.assistant-server-summary {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+
+.assistant-server-status {
+  border-radius: 999px;
+  padding: 2px 8px;
+  font-size: 10px;
+  text-transform: uppercase;
+  border: 1px solid var(--border);
+}
+
+.assistant-server-status-connected {
+  color: var(--success);
+}
+
+.assistant-server-status-error {
+  color: var(--danger);
+}
+
+.assistant-server-name {
+  font-weight: 600;
+}
+
+.assistant-server-trust {
+  color: var(--text-muted);
+}
+
+.assistant-server-url {
+  color: var(--text-muted);
+  word-break: break-all;
+  margin-top: 4px;
+}
+
+.assistant-server-error {
+  color: var(--danger);
+  margin-top: 4px;
+}
+
+.assistant-server-actions {
+  display: flex;
+  gap: 6px;
+  margin-top: 6px;
+}
+
+.assistant-server-actions button,
+.assistant-servers-header button {
+  appearance: none;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  background: var(--surface-1);
+  color: var(--text-primary);
+  padding: 4px 8px;
+  cursor: pointer;
+  font-size: 11px;
+}
+
+.assistant-server-actions button:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.assistant-server-tools {
+  list-style: none;
+  margin: 6px 0 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+}
+
+.assistant-tool-badge {
+  margin-left: 6px;
+  font-size: 10px;
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  padding: 1px 6px;
+  color: var(--text-muted);
+}
+
+.assistant-add-server-form {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.assistant-add-server-form input {
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  padding: 6px 8px;
+  font: inherit;
+  background: var(--surface-1);
+  color: var(--text-primary);
+}
+
+.assistant-add-server-form button {
+  appearance: none;
+  border: none;
+  border-radius: 6px;
+  background: var(--series-1);
+  color: white;
+  padding: 7px 10px;
+  cursor: pointer;
+  font-weight: 600;
+}
+
+.assistant-add-server-form button:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.assistant-boot-error {
+  padding: 40px;
+  font-family: system-ui, sans-serif;
+}
+
+/* Below 640px, tighten the chat's own padding and let the settings drawer
+   take the full width — it already overlays rather than sharing space with
+   the chat column, so there's no second-column layout to collapse here. */
+@media (max-width: 640px) {
+  .assistant-transcript {
+    padding: 16px 10px 8px;
+  }
+
+  .assistant-composer {
+    padding: 10px 10px 16px;
+  }
+
+  .assistant-sidebar {
+    width: 100%;
+    max-width: 100%;
+  }
+}

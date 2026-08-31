@@ -1,0 +1,223 @@
+/* Palette per the dataviz reference instance. Light is the default scope;
+   dark is declared under both the OS media query and an explicit host
+   data-theme stamp, so a host theme toggle wins either way. */
+:root,
+.viz-root {
+  color-scheme: light;
+  --surface-1: #fcfcfb;
+  --text-primary: #0b0b0b;
+  --text-secondary: #52514e;
+  --text-muted: #898781;
+  --gridline: #e1e0d9;
+  --baseline: #c3c2b7;
+  --border: rgba(11, 11, 11, 0.1);
+  --success: #006300;
+
+  --series-1: #2a78d6; /* blue - sequential default / channel 1 */
+  --series-2: #eb6834; /* orange - channel 2 */
+  --series-3: #1baf7a; /* aqua - channel 3 */
+
+  --seq-100: #cde2fb;
+  --seq-400: #3987e5;
+  --seq-450: #2a78d6;
+  --seq-600: #184f95;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root:where(:not([data-theme="light"])),
+  .viz-root:where(:not([data-theme="light"])) {
+    color-scheme: dark;
+    --surface-1: #1a1a19;
+    --text-primary: #ffffff;
+    --text-secondary: #c3c2b7;
+    --text-muted: #898781;
+    --gridline: #2c2c2a;
+    --baseline: #383835;
+    --border: rgba(255, 255, 255, 0.1);
+    --success: #0ca30c;
+
+    --series-1: #3987e5;
+    --series-2: #d95926;
+    --series-3: #199e70;
+  }
+}
+
+:root[data-theme="dark"],
+.viz-root[data-theme="dark"] {
+  color-scheme: dark;
+  --surface-1: #1a1a19;
+  --text-primary: #ffffff;
+  --text-secondary: #c3c2b7;
+  --text-muted: #898781;
+  --gridline: #2c2c2a;
+  --baseline: #383835;
+  --border: rgba(255, 255, 255, 0.1);
+  --success: #0ca30c;
+
+  --series-1: #3987e5;
+  --series-2: #d95926;
+  --series-3: #199e70;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html,
+body {
+  margin: 0;
+  padding: 0;
+  background: transparent;
+}
+
+body {
+  font-family: system-ui, -apple-system, "Segoe UI", sans-serif;
+  color: var(--text-primary);
+}
+
+.viz-root {
+  background: var(--surface-1);
+  padding: 16px 20px 20px;
+}
+
+.viz-header {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 4px;
+  flex-wrap: wrap;
+}
+
+.viz-title {
+  font-size: 15px;
+  font-weight: 600;
+  color: var(--text-primary);
+}
+
+.viz-subtitle {
+  font-size: 12px;
+  color: var(--text-secondary);
+}
+
+.viz-stat {
+  font-size: 12px;
+  color: var(--text-secondary);
+}
+
+.viz-stat strong {
+  color: var(--text-primary);
+  font-weight: 600;
+}
+
+.viz-delta-up {
+  color: var(--success);
+  font-weight: 600;
+}
+
+.viz-delta-down {
+  color: var(--text-secondary);
+  font-weight: 600;
+}
+
+.viz-filters {
+  display: flex;
+  gap: 6px;
+  margin: 10px 0 14px;
+  flex-wrap: wrap;
+}
+
+.viz-segmented {
+  display: inline-flex;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  overflow: hidden;
+}
+
+.viz-segmented button {
+  appearance: none;
+  border: none;
+  background: transparent;
+  color: var(--text-secondary);
+  font: inherit;
+  font-size: 12px;
+  padding: 5px 10px;
+  cursor: pointer;
+}
+
+.viz-segmented button + button {
+  border-left: 1px solid var(--border);
+}
+
+.viz-segmented button[data-active="true"] {
+  background: var(--series-1);
+  color: white;
+  font-weight: 600;
+}
+
+.viz-toggle {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 12px;
+  color: var(--text-secondary);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 5px 10px;
+  cursor: pointer;
+  background: transparent;
+  font-family: inherit;
+}
+
+.viz-toggle[data-active="true"] {
+  color: var(--text-primary);
+  font-weight: 600;
+}
+
+.viz-legend {
+  display: flex;
+  gap: 14px;
+  margin-top: 10px;
+  flex-wrap: wrap;
+}
+
+.viz-legend-item {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 12px;
+  color: var(--text-secondary);
+}
+
+.viz-legend-swatch {
+  width: 8px;
+  height: 8px;
+  border-radius: 2px;
+  flex: none;
+}
+
+.viz-tooltip {
+  position: absolute;
+  pointer-events: none;
+  background: var(--text-primary);
+  color: var(--surface-1);
+  font-size: 11px;
+  line-height: 1.4;
+  padding: 6px 8px;
+  border-radius: 6px;
+  white-space: nowrap;
+  transform: translate(-50%, -100%);
+  z-index: 10;
+}
+
+.viz-loading {
+  font-size: 13px;
+  color: var(--text-secondary);
+  padding: 24px 0;
+}
+
+.viz-footnote {
+  margin-top: 10px;
+  font-size: 11px;
+  color: var(--text-muted);
+}

@@ -1,0 +1,19 @@
+{
+  "permissions": {
+    "allow": [
+      "WebFetch(domain:github.com)",
+      "Bash(curl -s https://raw.githubusercontent.com/modelcontextprotocol/ext-apps/main/examples/basic-server-react/server.ts)",
+      "Bash(curl -s https://raw.githubusercontent.com/modelcontextprotocol/ext-apps/main/examples/basic-server-react/package.json)",
+      "Bash(curl -s https://api.github.com/repos/modelcontextprotocol/ext-apps/contents/examples/basic-server-react/src)",
+      "Bash(curl -s https://api.github.com/repos/modelcontextprotocol/ext-apps/contents/examples/basic-server-react)",
+      "Bash(curl -s https://unpkg.com/@modelcontextprotocol/ext-apps/dist/react/index.d.ts)",
+      "Bash(curl -s https://unpkg.com/@modelcontextprotocol/ext-apps/dist/index.d.ts)",
+      "Bash(curl -sL https://unpkg.com/@modelcontextprotocol/ext-apps@1.7.5/dist/react/index.d.ts)",
+      "Bash(curl -sL https://unpkg.com/@modelcontextprotocol/ext-apps@1.7.5/dist/index.d.ts)",
+      "Bash(curl -sL https://unpkg.com/@modelcontextprotocol/ext-apps@1.7.5/)",
+      "Bash(curl -sL https://unpkg.com/@modelcontextprotocol/ext-apps@1.7.5/package.json)",
+      "Bash(npx tsx *)",
+      "Bash(npx tsc *)"
+    ]
+  }
+}

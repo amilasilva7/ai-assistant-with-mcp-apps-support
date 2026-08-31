@@ -1,0 +1,45 @@
+{
+  "name": "sales-insights-mcp",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "POC MCP server: natural-language sales queries -> interactive MCP Apps chart, with markdown fallback",
+  "scripts": {
+    "clean": "node -e \"require('fs').rmSync('dist',{recursive:true,force:true})\"",
+    "build": "npm run clean && npm run build:trend && npm run build:region && npm run build:products && npm run build:leaderboard && npm run build:assistant",
+    "build:trend": "cross-env INPUT=ui/trend.html vite build",
+    "build:region": "cross-env INPUT=ui/region.html vite build",
+    "build:products": "cross-env INPUT=ui/products.html vite build",
+    "build:leaderboard": "cross-env INPUT=ui/leaderboard.html vite build",
+    "build:assistant": "vite build --config vite.assistant.config.ts",
+    "typecheck": "tsc --noEmit",
+    "serve": "tsx server/main.ts",
+    "serve:stdio": "tsx server/main.ts --stdio",
+    "assistant": "node --env-file-if-exists=.env --import tsx assistant/main.ts",
+    "dev:assistant": "vite --config vite.assistant.config.ts"
+  },
+  "dependencies": {
+    "@anthropic-ai/bedrock-sdk": "^0.33.3",
+    "@anthropic-ai/sdk": "^0.116.0",
+    "@modelcontextprotocol/ext-apps": "^1.7.5",
+    "@modelcontextprotocol/sdk": "^1.29.0",
+    "cors": "^2.8.5",
+    "express": "^5.1.0",
+    "react": "^19.2.0",
+    "react-dom": "^19.2.0",
+    "zod": "^4.1.13"
+  },
+  "devDependencies": {
+    "@types/cors": "^2.8.19",
+    "@types/express": "^5.0.0",
+    "@types/node": "^22.10.0",
+    "@types/react": "^19.2.2",
+    "@types/react-dom": "^19.2.2",
+    "@vitejs/plugin-react": "^4.3.4",
+    "cross-env": "^10.1.0",
+    "tsx": "^4.21.0",
+    "typescript": "^5.9.3",
+    "vite": "^6.0.0",
+    "vite-plugin-singlefile": "^2.3.0"
+  }
+}

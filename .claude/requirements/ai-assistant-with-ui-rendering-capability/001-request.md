@@ -1,0 +1,1 @@
+Ai assistant endpoint should have a nice UI that allow user to give prompts and based on prompts it should talks to LLM, mcp server, MCP app and should render UIs with textural results. Users should be able to add any mcp server and connect to this assistant. Ultimately, this will be a AI assistant with MCP app support.
