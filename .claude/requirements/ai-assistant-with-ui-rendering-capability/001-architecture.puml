@@ -1,85 +1,37 @@
 @startuml ai-assistant-high-level-architecture
-title AI Assistant — High-Level Architecture\nCurrent POC (left) vs. Enterprise-Grade Replacement (right)
+title AI Assistant — Main Components
 
 skinparam componentStyle rectangle
 skinparam shadowing false
-skinparam wrapWidth 200
-skinparam package {
-  BackgroundColor<<poc>> #FFF6F0
-  BorderColor<<poc>> #D98C4A
-  BackgroundColor<<ent>> #F0FFF4
-  BorderColor<<ent>> #4AA36C
+skinparam defaultTextAlignment center
+skinparam component {
+  BackgroundColor #FFFFFF
+  BorderColor #555555
+}
+skinparam note {
+  BackgroundColor #F5F5F5
+  BorderColor #999999
 }
 
-actor "User" as User
+actor User
 
-package "Current POC Architecture" <<poc>> {
-  [Browser SPA\n(React, statically served\nby the same Express process)] as UI
-  [Widget Sandbox\n(iframe srcdoc + per-widget CSP)] as Widget
-  [Assistant Backend\n(single Express process, port 3002)] as Backend
-  [Turn Orchestrator\n(agent loop, tool-call budget,\nsystem-prompt/safety rules)] as Orchestrator
-  [In-Memory Session Store\n(Map — wiped on restart)] as Session
-  [LLM Provider Adapter\n(1 provider at a time,\ndirect vendor SDK calls)] as LLMAdapter
-  [MCP Registry\n(in-memory client pool,\nself-declared "builtin"/"user" trust)] as Registry
-  [.env Config\n(plaintext secrets on disk)] as EnvCfg
-  [Console Logging\n(stdout only, no audit trail)] as Logs
-  [Cloudflare Quick Tunnel\n(unguessable URL = only "auth")] as Tunnel
-}
+[Chat UI] as UI
+[Assistant\n(rules + orchestration)] as Backend
+[LLM] as LLM
+[MCP Tools] as MCP
+[Widget Renderer] as Widget
 
-cloud "LLM Vendor APIs" as LLMVendor {
-  [Anthropic / Gemini / Ollama / Bedrock]
-}
+User --> UI
+UI --> Backend
+Backend --> LLM : prompt
+Backend --> MCP : tool calls
+Backend --> Widget : render result
+UI --> Widget
 
-cloud "MCP Servers (1..N)" as MCPServers {
-  [Streamable HTTP,\nno mTLS, no central policy]
-}
-
-User --> Tunnel
-Tunnel --> Backend
-UI --> Backend : NDJSON /api/chat
-UI --> Widget : mount widget
-Backend --> Orchestrator
-Orchestrator --> Session
-Orchestrator --> LLMAdapter
-LLMAdapter --> LLMVendor
-Orchestrator --> Registry
-Registry --> MCPServers
-Backend --> EnvCfg
-Backend --> Logs
-
-package "Enterprise-Grade Replacement" <<ent>> {
-  [CDN / Edge-Hosted SPA\n(CloudFront, Cloudflare Pages,\nseparate from the API)] as EntUI
-  [Centrally-Managed Widget Policy\n(CSP service + content scanning)] as EntWidget
-  [Containerized Service Fleet\n(K8s/ECS behind an\nAPI Gateway + Load Balancer)] as EntBackend
-  [Same orchestrator logic,\nhorizontally scaled, stateless] as EntOrchestrator
-  [Redis / DynamoDB\n(shared, persistent, multi-instance)] as EntSession
-  [LLM Gateway / Router\n(Bedrock Gateway, Azure AI Gateway,\nLiteLLM / Portkey — multi-provider\nfallback, cost + PII controls)] as EntLLM
-  [Enterprise MCP Gateway\n(central catalog, policy engine,\nmTLS, per-tenant trust, audit)] as EntRegistry
-  [Vault / Secrets Manager\n(rotated, access-audited secrets)] as EntSecrets
-  [OpenTelemetry + Centralized Logging\n(Datadog / Splunk / ELK, tracing)] as EntLogs
-  [SSO/OIDC + API Gateway\n(Okta/Entra ID, JWT, WAF, rate limits)] as EntAuth
-}
-
-UI ..> EntUI : replace with
-Widget ..> EntWidget : replace with
-Backend ..> EntBackend : replace with
-Session ..> EntSession : replace with
-LLMAdapter ..> EntLLM : replace with
-Registry ..> EntRegistry : replace with
-EnvCfg ..> EntSecrets : replace with
-Logs ..> EntLogs : replace with
-Tunnel ..> EntAuth : replace with
-
-note bottom of EntRegistry
-  Enterprise MCP servers would sit
-  behind this gateway, not exposed
-  directly to the orchestrator.
-end note
-
-legend right
-  Orange box = current POC component
-  Green box = suggested enterprise replacement
-  Dashed arrow (..>) = "replace with" — same role, hardened implementation
-endlegend
+note bottom of UI     : enterprise: CDN + SSO
+note bottom of Backend : enterprise: containerized + secrets vault
+note bottom of LLM     : enterprise: LLM gateway (multi-vendor, fallback)
+note bottom of MCP     : enterprise: MCP gateway (policy, mTLS)
+note bottom of Widget  : enterprise: managed sandbox/CSP policy
 
 @enduml
