@@ -1,0 +1,77 @@
+@startuml ai-assistant-modularity
+title AI Assistant — Modularity & Swap Points
+
+skinparam componentStyle rectangle
+skinparam shadowing false
+skinparam defaultTextAlignment center
+skinparam component {
+  BackgroundColor #FFFFFF
+  BorderColor #555555
+}
+skinparam package {
+  BackgroundColor #FAFAFA
+  BorderColor #888888
+}
+
+package "assistant/\nBackend (:3002)" {
+  [routes/\nHTTP API layer] as Routes
+  [loop.ts\nTurn Orchestrator] as Loop
+  [registry.ts\nMCP client pool] as Registry
+
+  package "llm/\n(pluggable providers)" {
+    interface "LlmProvider" as LLMIface
+    [anthropic.ts] as P1
+    [gemini.ts] as P2
+    [ollama.ts] as P3
+    [bedrock.ts] as P4
+  }
+}
+
+package "ui/assistant/\nFrontend SPA" {
+  [App + state.ts] as AppState
+  [api.ts\n(HTTP/NDJSON client)] as Api
+  [host/\n(widget sandbox)] as Host
+}
+
+package "ui/apps + ui/shared\n(widget bundles)" {
+  [leaderboard]
+  [products]
+  [region]
+  [trend]
+  [shared UI kit] as SharedKit
+}
+
+[MCP Server(s)\nthis repo's server/, or\nany external MCP server] as MCPServers
+
+AppState --> Api
+AppState --> Host
+Api -down-> Routes : HTTP + NDJSON\n(only FE <-> BE coupling)
+Routes --> Loop
+Loop --> Registry
+Loop --> LLMIface : select vendor via .env
+
+P1 .up.|> LLMIface
+P2 .up.|> LLMIface
+P3 .up.|> LLMIface
+P4 .up.|> LLMIface
+
+Registry --> MCPServers : MCP protocol\n(add/remove at runtime)
+Host --> MCPServers : fetch widget HTML\n(resources/read)
+MCPServers ..> leaderboard
+MCPServers ..> products
+MCPServers ..> region
+MCPServers ..> trend
+
+leaderboard --> SharedKit
+products --> SharedKit
+region --> SharedKit
+trend --> SharedKit
+
+note bottom
+  Each box builds and deploys independently.
+  Swap points: LLM vendor (llm/ interface), MCP servers
+  (standard protocol, add/remove live), widget bundles
+  (share only ui/shared/, add new ones freely).
+end note
+
+@enduml
