@@ -15,10 +15,10 @@ import { MiniMarkdown } from "./MiniMarkdown";
 import { ToolResultCard } from "./ToolResultCard";
 
 const SUGGESTIONS = [
-  "I'm looking for available health insurance plans",
-  "Filter available health insurance plans for my family",
-  "Compare Family Basic and Family Classic plans",
-  "Get a quotation for a health plan",
+  "Search for available health insurance products",
+  "Filter only family type health insurance products",
+  "Get Full product details of Family IncomeShield basic products",
+  "Compare Family basic and family classic products",
 ];
 
 const AUTO_SCROLL_THRESHOLD_PX = 120;
