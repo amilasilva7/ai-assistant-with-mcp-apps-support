@@ -230,14 +230,37 @@ export function coerceToolArgs(inputSchema: Record<string, unknown>, args: Recor
   return out;
 }
 
+/** Comma-joined list of a tool's required parameter names, or "" if it has none. */
+export function summarizeRequiredParams(inputSchema: Record<string, unknown>): string {
+  const required = (inputSchema as { required?: unknown }).required;
+  if (!Array.isArray(required)) return "";
+  return required.filter((r): r is string => typeof r === "string").join(", ");
+}
+
+/**
+ * The description text is the model's primary tool-selection signal (it's
+ * matched against the user's request before any argument is ever built), so
+ * every distinguishing detail the MCP server gave us goes in here rather than
+ * being left for the model to infer from the raw JSON Schema alone — smaller/
+ * local models (Ollama) in particular are much better at matching a request
+ * against readable text than against a bare schema. `title` is a human name
+ * distinct from the machine `name` (MCP servers commonly set both), and the
+ * required-params summary lets the model rule a tool in/out before it even
+ * tries to build arguments.
+ */
 export function modelFacingTools(servers: ServerRecord[]): LlmToolDef[] {
   const defs: LlmToolDef[] = [];
   for (const server of servers) {
     for (const tool of server.tools) {
       if (!tool.offeredToModel) continue;
+      const label = tool.title && tool.title !== tool.name ? `"${tool.title}"` : tool.name;
+      const required = summarizeRequiredParams(tool.inputSchema);
+      const body = tool.description ?? tool.title ?? tool.name;
       defs.push({
         name: tool.alias,
-        description: `[server: ${server.name}] ${tool.description ?? tool.title ?? tool.name}`,
+        description:
+          `[server: ${server.name}] ${label} — ${body}` +
+          (required ? ` (requires: ${required})` : " (no required parameters)"),
         inputSchema: tool.inputSchema,
       });
     }
