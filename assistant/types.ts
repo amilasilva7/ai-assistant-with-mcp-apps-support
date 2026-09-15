@@ -9,9 +9,7 @@ export type ServerId = string;
 export type Trust = "builtin" | "user";
 export type ConnStatus = "connecting" | "connected" | "error" | "disabled";
 
-export type ServerTransportSpec =
-  | { kind: "in-process" }
-  | { kind: "streamable-http"; url: string; headers?: Record<string, string> };
+export type ServerTransportSpec = { kind: "streamable-http"; url: string; headers?: Record<string, string> };
 
 export interface RegisteredTool {
   alias: string;
@@ -44,13 +42,11 @@ export interface ServerRecord {
 
 /** Public projection sent to the browser: `transport.headers` is never included. */
 export type PublicServerRecord = Omit<ServerRecord, "transport"> & {
-  transport: { kind: "in-process" } | { kind: "streamable-http"; url: string };
+  transport: { kind: "streamable-http"; url: string };
 };
 
 export function toPublicServerRecord(s: ServerRecord): PublicServerRecord {
-  const transport: PublicServerRecord["transport"] =
-    s.transport.kind === "in-process" ? { kind: "in-process" } : { kind: "streamable-http", url: s.transport.url };
-  return { ...s, transport };
+  return { ...s, transport: { kind: "streamable-http", url: s.transport.url } };
 }
 
 export type ApprovalDecision = "once" | "session" | "deny";

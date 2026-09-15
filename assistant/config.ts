@@ -28,6 +28,10 @@ export interface SeedServer {
   name?: string;
   url: string;
   headers?: Record<string, string>;
+  /** "user" (default) if omitted — first tool call prompts for approval, widgets get the strict CSP.
+   * "builtin" skips approval and honours the server's own declared `_meta.ui.csp` — only use for a
+   * server you run/trust as much as this repo's own code. */
+  trust?: "builtin" | "user";
 }
 
 export interface Config {
@@ -162,6 +166,12 @@ export function loadConfig(): Config {
   const seedServers = e.json<SeedServer[]>("ASSISTANT_SERVERS", []);
   if (!Array.isArray(seedServers)) {
     e.problems.push("ASSISTANT_SERVERS must be a JSON array.");
+  } else {
+    for (const s of seedServers) {
+      if (s.trust !== undefined && s.trust !== "builtin" && s.trust !== "user") {
+        e.problems.push(`ASSISTANT_SERVERS entry "${s.name ?? s.url}" has trust="${s.trust}"; must be "builtin" or "user".`);
+      }
+    }
   }
 
   const config: Config = {

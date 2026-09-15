@@ -67,7 +67,7 @@ export type TurnEvent =
 export interface PublicServerRecord {
   id: string;
   name: string;
-  transport: { kind: "in-process" } | { kind: "streamable-http"; url: string };
+  transport: { kind: "streamable-http"; url: string };
   trust: Trust;
   removable: boolean;
   enabled: boolean;

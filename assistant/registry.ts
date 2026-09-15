@@ -1,13 +1,11 @@
 /**
  * ServerRegistry: owns one MCP `Client` (+ transport) per connected server,
- * the built-in sales-insights server connected in-process (D-2), and every
- * user-added server connected over Streamable HTTP (D-1). Emits status
- * events consumed by routes/events.ts.
+ * every one of them a user-added or seeded server connected over Streamable
+ * HTTP (D-1). Emits status events consumed by routes/events.ts.
  */
 import { EventEmitter } from "node:events";
 import { Client } from "@modelcontextprotocol/sdk/client/index.js";
 import { StreamableHTTPClientTransport } from "@modelcontextprotocol/sdk/client/streamableHttp.js";
-import { InMemoryTransport } from "@modelcontextprotocol/sdk/inMemory.js";
 import type { Transport } from "@modelcontextprotocol/sdk/shared/transport.js";
 import {
   ErrorCode,
@@ -16,7 +14,6 @@ import {
   type CallToolResult,
   type ReadResourceResult,
 } from "@modelcontextprotocol/sdk/types.js";
-import { createServer as createSalesInsightsServer } from "../server/server.js";
 import type { Config } from "./config.js";
 import { logError, logServerStatus } from "./log.js";
 import { assignAliases, buildRegisteredTools, refreshOfferedToModel, slugify } from "./tools.js";
@@ -104,40 +101,16 @@ export class ServerRegistry {
 
   // --- connecting ------------------------------------------------------
 
-  async connectBuiltin(): Promise<ServerRecord> {
-    const server: ServerRecord = {
-      id: "sales-insights",
-      name: "Sales Insights (built-in)",
-      transport: { kind: "in-process" },
-      trust: "builtin",
-      removable: false,
-      enabled: true,
-      status: "connecting",
-      tools: [],
-    };
-    this.servers.set(server.id, server);
-    this.emitStatus(server);
-    await this.connectInProcess(server);
-    return server;
-  }
-
-  private async connectInProcess(server: ServerRecord): Promise<void> {
-    const mcpServer = createSalesInsightsServer();
-    const [clientTransport, serverTransport] = InMemoryTransport.createLinkedPair();
-    const client = new Client(CLIENT_INFO, { capabilities: {} });
-    try {
-      await mcpServer.connect(serverTransport);
-    } catch (err) {
-      server.status = "error";
-      server.lastError = { message: errMessage(err), code: "SERVER_CONNECT_FAILED", at: new Date().toISOString() };
-      logError(`registry:${server.id}`, err);
-      this.emitStatus(server);
-      return;
-    }
-    await this.establish(server, client, clientTransport);
-  }
-
-  async addHttp(url: string, name: string | undefined, headers: Record<string, string> | undefined): Promise<ServerRecord> {
+  // `trust` defaults to "user" — the runtime "Add server" UI never passes anything else, since a
+  // human clicking "add" has no way to vouch for a server the way a startup-config seed can. Only
+  // `ASSISTANT_SERVERS` seeds (main.ts) can request "builtin": that's a deliberate operator decision
+  // made in `.env`, not something reachable from the browser.
+  async addHttp(
+    url: string,
+    name: string | undefined,
+    headers: Record<string, string> | undefined,
+    trust: "builtin" | "user" = "user",
+  ): Promise<ServerRecord> {
     let parsed: URL;
     try {
       parsed = new URL(url);
@@ -156,8 +129,8 @@ export class ServerRegistry {
       id,
       name: displayName,
       transport: { kind: "streamable-http", url, headers },
-      trust: "user",
-      removable: true,
+      trust,
+      removable: trust !== "builtin",
       enabled: true,
       status: "connecting",
       tools: [],
@@ -178,16 +151,12 @@ export class ServerRegistry {
     server.lastError = undefined;
     this.emitStatus(server);
 
-    if (server.transport.kind === "in-process") {
-      await this.connectInProcess(server);
-    } else {
-      const client = new Client(CLIENT_INFO, { capabilities: {} });
-      const transport = new StreamableHTTPClientTransport(
-        new URL(server.transport.url),
-        server.transport.headers ? { requestInit: { headers: server.transport.headers } } : undefined,
-      );
-      await this.establish(server, client, transport);
-    }
+    const client = new Client(CLIENT_INFO, { capabilities: {} });
+    const transport = new StreamableHTTPClientTransport(
+      new URL(server.transport.url),
+      server.transport.headers ? { requestInit: { headers: server.transport.headers } } : undefined,
+    );
+    await this.establish(server, client, transport);
     return server;
   }
 

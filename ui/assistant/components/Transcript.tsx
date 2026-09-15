@@ -15,10 +15,10 @@ import { MiniMarkdown } from "./MiniMarkdown";
 import { ToolResultCard } from "./ToolResultCard";
 
 const SUGGESTIONS = [
-  "How did sales trend this month?",
-  "Break down sales by region",
-  "What are our top 5 products?",
-  "Who are the top performing reps?",
+  "Search for available health insurance products",
+  "Filter only family type health insurance products",
+  "Get Full product details of Family IncomeShield basic products",
+  "Compare Family basic and family classic products",
 ];
 
 const AUTO_SCROLL_THRESHOLD_PX = 120;
@@ -68,7 +68,7 @@ export function Transcript(props: TranscriptProps) {
     <div className="assistant-transcript" ref={scrollRef}>
       {items.length === 0 && (
         <div className="assistant-empty-state">
-          <p>Ask about sales — trend, region, products, or the leaderboard.</p>
+          <p>Ask about health insurance plans — search, filter, compare, or get a quotation.</p>
           <div className="assistant-suggestions">
             {SUGGESTIONS.map((s) => (
               <button key={s} type="button" className="assistant-suggestion-chip" onClick={() => onSuggestion(s)}>

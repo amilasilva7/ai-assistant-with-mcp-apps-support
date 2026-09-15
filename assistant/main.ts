@@ -3,7 +3,7 @@
  *   npm run serve:assistant  -> http://127.0.0.1:3002
  *
  * Startup order follows design §3.4: config -> SPA build check (fatal) ->
- * widget bundle check (warn) -> registry -> bind guard -> listen.
+ * registry -> bind guard -> listen.
  */
 import { existsSync } from "node:fs";
 import path from "node:path";
@@ -25,7 +25,6 @@ import { createEventsRouter } from "./routes/events.js";
 
 const ROOT_DIR = path.join(import.meta.dirname, "..");
 const SPA_DIR = path.join(ROOT_DIR, "dist", "assistant");
-const WIDGET_DIR = path.join(ROOT_DIR, "dist", "ui");
 
 // The assistant's own SPA CSP (review R-6: the design left this dangling).
 // It must permit the `srcdoc` child iframes the host creates for widgets —
@@ -63,16 +62,6 @@ const SPA_CSP = [
   "frame-ancestors 'none'",
 ].join("; ");
 
-function widgetFileNameFromResourceUri(resourceUri: string): string | undefined {
-  try {
-    const u = new URL(resourceUri);
-    const segments = u.pathname.split("/").filter(Boolean);
-    return segments[segments.length - 1];
-  } catch {
-    return undefined;
-  }
-}
-
 async function main() {
   const config = loadConfig();
   initLogging(config);
@@ -98,27 +87,12 @@ async function main() {
   }
 
   const registry = new ServerRegistry(config);
-  await registry.connectBuiltin();
 
   const buildWarnings: string[] = [];
-  const builtin = registry.get("sales-insights");
-  if (builtin) {
-    for (const tool of builtin.tools) {
-      if (!tool.resourceUri) continue;
-      const fileName = widgetFileNameFromResourceUri(tool.resourceUri);
-      const exists = fileName ? existsSync(path.join(WIDGET_DIR, fileName)) : false;
-      if (!exists) {
-        tool.widgetUnavailable = true;
-        const msg = `widget bundle not built for "${tool.name}" (expected dist/ui/${fileName ?? "?"}) — run "npm run build"`;
-        buildWarnings.push(msg);
-        console.warn(`[main] ${msg}`);
-      }
-    }
-  }
 
   for (const seed of config.seedServers) {
     try {
-      await registry.addHttp(seed.url, seed.name, seed.headers);
+      await registry.addHttp(seed.url, seed.name, seed.headers, seed.trust);
     } catch (err) {
       logError("main:seed", err);
     }

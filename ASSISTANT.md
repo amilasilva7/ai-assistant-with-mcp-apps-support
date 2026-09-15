@@ -181,18 +181,19 @@ rather than guessing one from the Anthropic model name.
 
 ## Adding MCP servers
 
-The built-in `sales-insights` server (this repo's own 4 tools) is always
-connected and can't be removed (only disabled) — see `assistant/config.ts`'s
-`D-8` note. To add more:
+There is no server built into the assistant's code anymore — every server
+(including the default `health-insurance-mcp`) is connected via
+`ASSISTANT_SERVERS` or added at runtime. To add more:
 
 **At runtime**, via the UI: open the assistant, click **Panel** (top right) to
 expand the side panel, and use the "Add server" form under **MCP servers** —
-paste a Streamable HTTP MCP endpoint URL (e.g.
-`http://localhost:3001/mcp` — this repo's own server, if you have `npm run
-serve` running separately, is a realistic test target). Added servers are
-untrusted (`trust: "user"`): their first tool call in a session prompts for
-approval, and their widgets render under a stricter default-deny sandbox
-regardless of what the server itself declares.
+paste a Streamable HTTP MCP endpoint URL (e.g. `http://localhost:3001/mcp` —
+this repo's own standalone sales-insights server, if you have `npm run serve`
+running separately, is a realistic test target). Servers added this way are
+always untrusted (`trust: "user"`): their first tool call in a session prompts
+for approval, and their widgets render under a stricter default-deny sandbox
+regardless of what the server itself declares. There is no UI path to
+self-grant elevated trust — that's deliberate.
 
 **At startup**, via a read-only seed (no UI interaction needed, e.g. for a
 repeatable demo setup):
@@ -202,8 +203,17 @@ repeatable demo setup):
 ASSISTANT_SERVERS=[{"name":"local mcp","url":"http://localhost:3001/mcp"}]
 ```
 
-Seeded servers are still `trust: "user"` and still require the first-use
-approval prompt — the seed only saves you re-typing the URL every restart.
+Seeded servers default to `trust: "user"` too (still require the first-use
+approval prompt) — the seed only saves you re-typing the URL every restart.
+Add `"trust":"builtin"` to a seed entry to skip the approval prompt and honour
+that server's own declared `_meta.ui.csp` instead of the strict default-deny
+sandbox — only do this for a server you run/trust as much as this repo's own
+code:
+
+```bash
+ASSISTANT_SERVERS=[{"name":"health-insurance-mcp","url":"http://localhost:8787/mcp","trust":"builtin"}]
+```
+
 Nothing is persisted across restarts beyond this env var; servers added
 through the UI vanish when the process restarts.
 

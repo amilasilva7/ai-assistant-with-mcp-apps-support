@@ -40,6 +40,22 @@ function extractText(content: ContentBlockLike[] | undefined): string {
     .join("\n\n");
 }
 
+function formatJson(value: unknown): string {
+  try {
+    return JSON.stringify(value, null, 2);
+  } catch {
+    return String(value);
+  }
+}
+
+// A tool failure's raw text (schema validation dumps, JSON-RPC error codes) is
+// exactly the kind of detail the model is now instructed to translate into a
+// plain request for whatever's missing rather than repeat verbatim (see
+// loop.ts's tool-first policy) — this is the UI's half of that: keep the raw
+// text out of the line every user sees by default, but never actually hide
+// it, since "Technical details" below always carries it.
+const FRIENDLY_ERROR_TEXT = "This request couldn't be completed as sent — see “Technical details” below for what went wrong.";
+
 export function ToolResultCard(props: ToolResultCardProps) {
   const { item, sessionId, widgetInitTimeoutMs, onApprove, onWidgetMessage, onHostNotice } = props;
   const [fallbackReason, setFallbackReason] = useState<string | null>(null);
@@ -55,9 +71,11 @@ export function ToolResultCard(props: ToolResultCardProps) {
   const attemptWidget = Boolean(item.resourceUri) && !item.widgetUnavailable && !fallbackReason && Boolean(sessionId);
 
   const summaryText = item.error
-    ? item.error.message
+    ? FRIENDLY_ERROR_TEXT
     : item.result
-      ? extractText(item.result.content) || "(no text content)"
+      ? item.result.isError
+        ? FRIENDLY_ERROR_TEXT
+        : extractText(item.result.content) || "(no text content)"
       : item.approvalPending
         ? "Waiting for approval…"
         : item.cancelled
@@ -70,6 +88,14 @@ export function ToolResultCard(props: ToolResultCardProps) {
   if (item.result?.truncated) statusParts.push("trimmed for the model");
   if (item.result?.isError) statusParts.push("tool reported an error");
   if (item.trust === "user") statusParts.push("user-added server");
+
+  const hasTechnicalDetails = Boolean(item.input) || Boolean(item.result) || Boolean(item.error);
+  const requestJson = formatJson({ tool: item.toolName, arguments: item.input ?? {} });
+  const responseJson = item.error
+    ? formatJson({ code: item.error.code, message: item.error.message })
+    : item.result
+      ? formatJson({ isError: item.result.isError ?? false, content: item.result.content, structuredContent: item.result.structuredContent })
+      : undefined;
 
   return (
     <div className="assistant-tool-card">
@@ -127,6 +153,24 @@ export function ToolResultCard(props: ToolResultCardProps) {
         <div className="assistant-text-summary-body">
           <MiniMarkdown text={summaryText} />
         </div>
+      )}
+
+      {hasTechnicalDetails && (
+        <details className="assistant-tool-details">
+          <summary>Technical details</summary>
+          <div className="assistant-technical-body">
+            <div className="assistant-technical-block">
+              <span className="assistant-technical-label">Request</span>
+              <pre>{requestJson}</pre>
+            </div>
+            {responseJson !== undefined && (
+              <div className="assistant-technical-block">
+                <span className="assistant-technical-label">Response</span>
+                <pre>{responseJson}</pre>
+              </div>
+            )}
+          </div>
+        </details>
       )}
     </div>
   );
