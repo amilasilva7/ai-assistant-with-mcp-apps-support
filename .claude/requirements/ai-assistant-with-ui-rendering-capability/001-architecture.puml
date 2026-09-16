@@ -1,0 +1,37 @@
+@startuml ai-assistant-high-level-architecture
+title AI Assistant — Main Components
+
+skinparam componentStyle rectangle
+skinparam shadowing false
+skinparam defaultTextAlignment center
+skinparam component {
+  BackgroundColor #FFFFFF
+  BorderColor #555555
+}
+skinparam note {
+  BackgroundColor #F5F5F5
+  BorderColor #999999
+}
+
+actor User
+
+[Chat UI] as UI
+[Assistant\n(rules + orchestration)] as Backend
+[LLM] as LLM
+[MCP Tools] as MCP
+[Widget Renderer] as Widget
+
+User --> UI
+UI --> Backend
+Backend --> LLM : prompt
+Backend --> MCP : tool calls
+Backend --> Widget : render result
+UI --> Widget
+
+note bottom of UI     : enterprise: CDN + SSO
+note bottom of Backend : enterprise: containerized + secrets vault
+note bottom of LLM     : enterprise: LLM gateway (multi-vendor, fallback)
+note bottom of MCP     : enterprise: MCP gateway (policy, mTLS)
+note bottom of Widget  : enterprise: managed sandbox/CSP policy
+
+@enduml
