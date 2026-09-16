@@ -3,15 +3,17 @@
 # of Anthropic/Gemini, to sidestep their rate limits during development:
 #   1. start (or reuse) an Ollama container in Docker
 #   2. pull the model if it isn't already present
-#   3. point .env at it — no API key needed, Ollama is unauthenticated
-#   4. build the project
-#   5. start the assistant
-#   6. open a Cloudflare quick tunnel and wire ASSISTANT_PUBLIC_ORIGIN to it
+#   3. start the Postgres container (docker-compose.yml's `db` service) that
+#      chat history lives in — assistant/main.ts refuses to start without it
+#   4. point .env at Ollama — no API key needed, Ollama is unauthenticated
+#   5. build the project
+#   6. start the assistant
+#   7. open a Cloudflare quick tunnel and wire ASSISTANT_PUBLIC_ORIGIN to it
 #      (see assistant/config.ts and assistant/main.ts for why that's needed)
 #
 # Deliberately NOT wired into `npm run build`/`npm run assistant` — this is
-# an opt-in convenience script. Docker and the model live entirely outside
-# the Node project; nothing here becomes a project dependency.
+# an opt-in convenience script. Docker, the model, and Postgres all live
+# outside the Node project; nothing here becomes a project dependency.
 #
 # Usage:
 #   scripts/start-with-ollama.sh              # full stack incl. tunnel
@@ -84,6 +86,15 @@ wait_for_http() {
   return 1
 }
 
+wait_for_healthy() {
+  local name="$1" timeout="${2:-30}"
+  for _ in $(seq 1 "$timeout"); do
+    [ "$(docker inspect -f '{{.State.Health.Status}}' "$name" 2>/dev/null)" = "healthy" ] && return 0
+    sleep 1
+  done
+  return 1
+}
+
 command -v docker >/dev/null 2>&1 || die "Docker is not installed or not on PATH."
 docker info >/dev/null 2>&1 || die "Docker daemon isn't running — start Docker Desktop and retry."
 command -v npx >/dev/null 2>&1 || die "npx (Node.js) is not on PATH."
@@ -112,7 +123,16 @@ else
   docker exec "$CONTAINER_NAME" ollama pull "$MODEL"
 fi
 
-# --- 3. Point .env at it ------------------------------------------------
+# --- 3. Postgres (chat history) ---------------------------------------------
+# assistant/main.ts connects to this at boot and exits with a fatal error if
+# it can't — this has to be up before step 6 starts the assistant, same as
+# Ollama has to be up before the assistant can talk to it.
+log "Starting Postgres for chat history (docker compose)..."
+docker compose up -d db
+wait_for_healthy "income-mcp-assistant-db" 30 || die "Postgres didn't become healthy within 30s. Check: docker compose logs db"
+echo "  Up (data persists in the 'assistant_db_data' Docker volume)."
+
+# --- 4. Point .env at Ollama ------------------------------------------------
 log "Updating .env..."
 [ -f "$ENV_FILE" ] || cp "$REPO_ROOT/.env.example" "$ENV_FILE"
 set_env "ASSISTANT_LLM_PROVIDER" "ollama"
@@ -120,11 +140,11 @@ set_env "ASSISTANT_MODEL" "$MODEL"
 set_env "OLLAMA_BASE_URL" "http://localhost:$OLLAMA_PORT"
 echo "  Done — no API key needed, Ollama is an unauthenticated local server."
 
-# --- 4. Build -----------------------------------------------------------
+# --- 5. Build -----------------------------------------------------------
 log "Building the project..."
 npm run build
 
-# --- 5. Start the assistant ----------------------------------------------
+# --- 6. Start the assistant ----------------------------------------------
 free_port "$ASSISTANT_PORT"
 log "Starting the assistant on port $ASSISTANT_PORT..."
 nohup npm run assistant > /tmp/assistant-ollama.log 2>&1 &
@@ -138,14 +158,15 @@ echo "  Up (PID $ASSISTANT_PID)."
 
 if [ "$NO_TUNNEL" = true ]; then
   log "Ready (no tunnel requested)."
-  echo "  Local:  http://localhost:$ASSISTANT_PORT"
-  echo "  Ollama: $CONTAINER_NAME (model $MODEL) on port $OLLAMA_PORT"
-  echo "  Logs:   /tmp/assistant-ollama.log"
-  echo "  Stop:   kill $ASSISTANT_PID   (Ollama keeps running; 'docker stop $CONTAINER_NAME' to stop that too)"
+  echo "  Local:    http://localhost:$ASSISTANT_PORT"
+  echo "  Ollama:   $CONTAINER_NAME (model $MODEL) on port $OLLAMA_PORT"
+  echo "  Postgres: income-mcp-assistant-db (chat history)"
+  echo "  Logs:     /tmp/assistant-ollama.log"
+  echo "  Stop:     kill $ASSISTANT_PID   (Ollama and Postgres keep running; 'docker stop $CONTAINER_NAME' and 'docker compose down' to stop those too)"
   exit 0
 fi
 
-# --- 6. Cloudflare tunnel -------------------------------------------------
+# --- 7. Cloudflare tunnel -------------------------------------------------
 log "Opening a Cloudflare tunnel..."
 rm -f /tmp/cloudflared-ollama.log
 nohup npx cloudflared tunnel --url "http://localhost:$ASSISTANT_PORT" > /tmp/cloudflared-ollama.log 2>&1 &
@@ -174,10 +195,11 @@ wait_for_http "http://localhost:$ASSISTANT_PORT/api/config" 30 || {
 }
 
 log "Ready."
-echo "  Local:  http://localhost:$ASSISTANT_PORT"
-echo "  Public: $TUNNEL_URL"
-echo "  Ollama: $CONTAINER_NAME (model $MODEL) on port $OLLAMA_PORT"
-echo "  Logs:   /tmp/assistant-ollama.log , /tmp/cloudflared-ollama.log"
+echo "  Local:    http://localhost:$ASSISTANT_PORT"
+echo "  Public:   $TUNNEL_URL"
+echo "  Ollama:   $CONTAINER_NAME (model $MODEL) on port $OLLAMA_PORT"
+echo "  Postgres: income-mcp-assistant-db (chat history)"
+echo "  Logs:     /tmp/assistant-ollama.log , /tmp/cloudflared-ollama.log"
 echo
-echo "  Stop:   kill $ASSISTANT_PID $CLOUDFLARED_PID"
-echo "          (Ollama keeps running for next time; 'docker stop $CONTAINER_NAME' to stop that too)"
+echo "  Stop:     kill $ASSISTANT_PID $CLOUDFLARED_PID"
+echo "            (Ollama and Postgres keep running for next time; 'docker stop $CONTAINER_NAME' and 'docker compose down' to stop those too)"

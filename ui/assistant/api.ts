@@ -102,6 +102,22 @@ export interface LlmState {
   model: string;
 }
 
+// Mirrors assistant/llm/provider.ts's LlmMessage — same deliberate
+// duplication rationale as ContentBlockLike/TurnEvent above (see this
+// file's header comment): a chat's persisted history is these blocks
+// verbatim, and state.ts's messagesToTranscript() converts them into
+// TranscriptItems for display.
+export type LlmUserBlockLike = { type: "text"; text: string } | { type: "tool_result"; toolUseId: string; isError?: boolean; text: string };
+export type LlmAssistantBlockLike = { type: "text"; text: string } | { type: "tool_use"; id: string; name: string; input: Record<string, unknown> };
+export type LlmMessageLike = { role: "user"; content: LlmUserBlockLike[] } | { role: "assistant"; content: LlmAssistantBlockLike[] };
+
+export interface ChatSummary {
+  id: string;
+  title: string;
+  createdAt: number;
+  updatedAt: number;
+}
+
 async function asJson<T>(res: Response): Promise<T> {
   if (!res.ok) {
     let body: unknown;
@@ -180,6 +196,22 @@ export async function reconnectServer(id: string): Promise<PublicServerRecord> {
   const res = await fetch(`/api/servers/${encodeURIComponent(id)}/reconnect`, { method: "POST" });
   const { server } = await asJson<{ server: PublicServerRecord }>(res);
   return server;
+}
+
+export async function listChats(): Promise<ChatSummary[]> {
+  const res = await fetch("/api/chats");
+  const { chats } = await asJson<{ chats: ChatSummary[] }>(res);
+  return chats;
+}
+
+export async function openChat(id: string): Promise<{ sessionId: string; title: string; messages: LlmMessageLike[] }> {
+  const res = await fetch(`/api/chats/${encodeURIComponent(id)}/open`, { method: "POST" });
+  return asJson(res);
+}
+
+export async function deleteChat(id: string): Promise<void> {
+  const res = await fetch(`/api/chats/${encodeURIComponent(id)}`, { method: "DELETE" });
+  if (!res.ok) await asJson(res);
 }
 
 export class ChatConflictError extends Error {}

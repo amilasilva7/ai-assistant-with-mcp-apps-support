@@ -122,10 +122,34 @@ a {
   background: var(--surface-2);
 }
 
+.assistant-header-start {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
 .assistant-header h1 {
   font-size: 15px;
   font-weight: 700;
   margin: 0;
+  color: var(--series-1);
+}
+
+.assistant-history-toggle {
+  appearance: none;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: transparent;
+  color: var(--text-primary);
+  padding: 6px 10px;
+  cursor: pointer;
+  font-size: 13px;
+  line-height: 1;
+  transition: border-color 120ms, color 120ms;
+}
+
+.assistant-history-toggle:hover {
+  border-color: var(--series-1);
   color: var(--series-1);
 }
 
@@ -145,6 +169,34 @@ a {
   color: var(--series-1);
 }
 
+.assistant-header-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.assistant-new-chat-button {
+  appearance: none;
+  border: 1px solid var(--series-1);
+  border-radius: 8px;
+  background: transparent;
+  color: var(--series-1);
+  padding: 6px 12px;
+  cursor: pointer;
+  font-weight: 600;
+  transition: background 120ms, color 120ms;
+}
+
+.assistant-new-chat-button:hover:not(:disabled) {
+  background: var(--series-1);
+  color: white;
+}
+
+.assistant-new-chat-button:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
 .assistant-build-warning {
   background: rgba(155, 123, 19, 0.12);
   color: var(--warn);
@@ -158,6 +210,79 @@ a {
   display: flex;
   min-height: 0;
   position: relative;
+}
+
+/* Left chat-history sidebar (ChatGPT/Claude-style): an in-flow column on
+   desktop that pushes the chat aside rather than covering it, collapsing to
+   width:0 instead of unmounting so ChatHistoryPanel's own fetched list state
+   survives a collapse. Below 640px (media query at the bottom of this file)
+   it switches to the same overlay+backdrop pattern as .assistant-sidebar on
+   the right, since there's no room to share the screen with the chat. */
+.assistant-history-sidebar {
+  flex: none;
+  width: 260px;
+  min-height: 0;
+  border-right: 1px solid var(--border);
+  background: var(--surface-2);
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  transition: width 160ms ease;
+}
+
+.assistant-history-sidebar-collapsed {
+  width: 0;
+  border-right-color: transparent;
+}
+
+.assistant-history-sidebar-header {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 10px;
+  border-bottom: 1px solid var(--border);
+}
+
+.assistant-history-collapse {
+  appearance: none;
+  flex: none;
+  width: 28px;
+  height: 28px;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  background: transparent;
+  color: var(--text-secondary);
+  cursor: pointer;
+  font-size: 14px;
+  line-height: 1;
+}
+
+.assistant-history-collapse:hover {
+  border-color: var(--series-1);
+  color: var(--series-1);
+}
+
+.assistant-history-sidebar .assistant-new-chat-button {
+  flex: 1;
+  min-width: 0;
+}
+
+.assistant-history-sidebar-body {
+  flex: 1;
+  min-height: 0;
+  min-width: 260px;
+  overflow-y: auto;
+  padding: 8px;
+}
+
+/* Only meaningful below 640px — see the media query at the bottom of this
+   file, which is the only place this becomes visible. */
+.assistant-history-backdrop {
+  position: absolute;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.25);
+  z-index: 5;
+  display: none;
 }
 
 /* One chat column — text and widgets scroll together in Transcript.tsx (see
@@ -244,6 +369,86 @@ a {
 
 .assistant-panel-section-body {
   padding: 0 12px 12px;
+}
+
+.assistant-history-empty,
+.assistant-history-error {
+  font-size: 12px;
+  color: var(--text-muted);
+  margin: 0;
+}
+
+.assistant-history-error {
+  color: var(--danger);
+}
+
+.assistant-history-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.assistant-history-item {
+  display: flex;
+  align-items: stretch;
+  gap: 2px;
+  border-radius: 8px;
+}
+
+.assistant-history-item-active {
+  background: rgba(245, 113, 0, 0.1);
+}
+
+.assistant-history-open {
+  flex: 1;
+  min-width: 0;
+  appearance: none;
+  border: none;
+  background: transparent;
+  color: var(--text-primary);
+  padding: 6px 8px;
+  cursor: pointer;
+  text-align: left;
+  border-radius: 8px;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.assistant-history-open:hover {
+  background: var(--surface-1);
+}
+
+.assistant-history-title {
+  font-size: 12px;
+  font-weight: 600;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.assistant-history-date {
+  font-size: 10px;
+  color: var(--text-muted);
+}
+
+.assistant-history-delete {
+  appearance: none;
+  border: none;
+  background: transparent;
+  cursor: pointer;
+  padding: 6px 8px;
+  font-size: 12px;
+  border-radius: 8px;
+  opacity: 0.6;
+}
+
+.assistant-history-delete:hover {
+  opacity: 1;
+  background: rgba(171, 44, 35, 0.08);
 }
 
 .assistant-transcript {
@@ -343,6 +548,34 @@ a {
   letter-spacing: 0.04em;
   opacity: 0.8;
   margin-bottom: 2px;
+}
+
+.assistant-copy-button {
+  appearance: none;
+  border: none;
+  background: transparent;
+  display: block;
+  margin-top: 4px;
+  padding: 2px 0;
+  font-size: 11px;
+  cursor: pointer;
+  opacity: 0.6;
+  transition: opacity 120ms;
+}
+
+.assistant-copy-button:hover,
+.assistant-copy-button:focus-visible {
+  opacity: 1;
+  text-decoration: underline;
+}
+
+.assistant-bubble-user .assistant-copy-button {
+  color: rgba(255, 255, 255, 0.85);
+  text-align: right;
+}
+
+.assistant-bubble-assistant .assistant-copy-button {
+  color: var(--text-muted);
 }
 
 .assistant-bubble-assistant {
@@ -953,5 +1186,28 @@ a {
   .assistant-sidebar {
     width: 100%;
     max-width: 100%;
+  }
+
+  /* The left history sidebar switches from an in-flow column to an overlay
+     here — there's no room to share the screen with the chat at this width,
+     the same reasoning that keeps .assistant-sidebar an overlay always. */
+  .assistant-history-sidebar {
+    position: absolute;
+    top: 0;
+    bottom: 0;
+    left: 0;
+    z-index: 6;
+    width: 85vw;
+    max-width: 300px;
+    box-shadow: 8px 0 24px rgba(0, 0, 0, 0.12);
+  }
+
+  .assistant-history-sidebar-collapsed {
+    width: 0;
+    box-shadow: none;
+  }
+
+  .assistant-history-backdrop {
+    display: block;
   }
 }

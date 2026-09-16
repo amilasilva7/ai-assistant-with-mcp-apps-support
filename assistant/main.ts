@@ -3,7 +3,7 @@
  *   npm run serve:assistant  -> http://127.0.0.1:3002
  *
  * Startup order follows design §3.4: config -> SPA build check (fatal) ->
- * registry -> bind guard -> listen.
+ * database connect (fatal) -> registry -> bind guard -> listen.
  */
 import { existsSync } from "node:fs";
 import path from "node:path";
@@ -13,15 +13,31 @@ import { loadConfig } from "./config.js";
 import { initLogging, logError } from "./log.js";
 import { ServerRegistry } from "./registry.js";
 import { LlmManager } from "./llm/manager.js";
+import { HistoryStore } from "./history.js";
 import { SessionStore } from "./session.js";
 import { createChatRouter } from "./routes/chat.js";
 import { createServersRouter } from "./routes/servers.js";
 import { createMcpRouter } from "./routes/mcp.js";
 import { createEventsRouter } from "./routes/events.js";
 import { createLlmRouter } from "./routes/llm.js";
+import { createHistoryRouter } from "./routes/history.js";
 
 const ROOT_DIR = path.join(import.meta.dirname, "..");
 const SPA_DIR = path.join(ROOT_DIR, "dist", "assistant");
+
+/**
+ * `pg`'s connection-refused failure is an `AggregateError` with an empty
+ * top-level `.message` (the real detail — e.g. `ECONNREFUSED` — is on
+ * `.code` and inside `.errors`), so `err.message` alone renders as blank.
+ * This surfaces whatever's actually informative.
+ */
+function describeDbError(err: unknown): string {
+  if (!(err instanceof Error)) return String(err);
+  const code = (err as { code?: string }).code;
+  const nested = (err as { errors?: unknown[] }).errors;
+  const parts = [err.message, code, ...(Array.isArray(nested) ? nested.map((e) => (e instanceof Error ? e.message : String(e))) : [])].filter(Boolean);
+  return parts.length > 0 ? parts.join(" — ") : err.name;
+}
 
 // The assistant's own SPA CSP (review R-6: the design left this dangling).
 // It must permit the `srcdoc` child iframes the host creates for widgets —
@@ -66,6 +82,28 @@ async function main() {
   if (!existsSync(path.join(SPA_DIR, "index.html"))) {
     console.error(
       `Fatal: ${path.join(SPA_DIR, "index.html")} not found. Run "npm run build" (or "npm run build:assistant") first.`,
+    );
+    process.exit(1);
+  }
+
+  const history = new HistoryStore(config.databaseUrl);
+  try {
+    await history.init();
+  } catch (err) {
+    // Fatal, not swallowed-and-continue (NFR-Reliability-1 is about *tool
+    // calls* failing mid-turn, not the assistant's own storage layer being
+    // unreachable at boot) — every route below assumes the chats table
+    // exists, so starting up anyway would just move this failure to the
+    // first chat message instead of surfacing it here with a fix.
+    console.error(
+      [
+        "",
+        "*** Could not connect to the assistant's Postgres database. ***",
+        `  DATABASE_URL: ${config.databaseUrl}`,
+        "  If it isn't running yet: docker compose up -d db",
+        `  Underlying error: ${describeDbError(err)}`,
+        "",
+      ].join("\n"),
     );
     process.exit(1);
   }
@@ -159,11 +197,12 @@ async function main() {
     res.json({ sessionId: session.id });
   });
 
-  app.use("/api", createChatRouter({ sessions, registry, llm: llmManager, config }));
+  app.use("/api", createChatRouter({ sessions, registry, llm: llmManager, config, history }));
   app.use("/api", createServersRouter(registry));
   app.use("/api", createMcpRouter({ sessions, registry, config }));
   app.use("/api", createEventsRouter(registry));
   app.use("/api", createLlmRouter(llmManager));
+  app.use("/api", createHistoryRouter({ history, sessions }));
 
   app.use(express.static(SPA_DIR));
   // Express 5's router (path-to-regexp v6+) rejects a bare "*" wildcard; a

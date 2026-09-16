@@ -82,7 +82,7 @@ export function ToolResultCard(props: ToolResultCardProps) {
           ? "This tool call was cancelled before it finished."
           : "Running…";
 
-  const statusParts = [`${item.serverName} · ${item.toolName}`];
+  const statusParts = [item.serverName ? `${item.serverName} · ${item.toolName}` : item.toolName];
   if (item.result) statusParts.push(formatDuration(item.result.durationMs));
   if (item.error) statusParts.push(formatDuration(item.error.durationMs));
   if (item.result?.truncated) statusParts.push("trimmed for the model");

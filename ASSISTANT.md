@@ -12,6 +12,7 @@ For the *design* (architecture, security model, request flow), see
 ## Contents
 
 - [Quick start](#quick-start)
+- [Chat history (Postgres)](#chat-history-postgres)
 - [Switching LLM providers](#switching-llm-providers)
   - [Anthropic (default)](#anthropic-default)
   - [Gemini](#gemini)
@@ -29,8 +30,9 @@ For the *design* (architecture, security model, request flow), see
 ```bash
 npm install
 cp .env.example .env      # then set ANTHROPIC_API_KEY in .env
-npm run build              # bundles the 4 widgets + the assistant SPA
-npm run assistant           # http://127.0.0.1:3002
+docker compose up -d db    # starts Postgres for chat history (see below)
+npm run build               # bundles the 4 widgets + the assistant SPA
+npm run assistant            # http://127.0.0.1:3002
 ```
 
 Everything below is variations on this: which provider, which MCP servers,
@@ -41,6 +43,29 @@ whether it's tunneled to a public URL.
 effect). `.env.example` is the committed template with every variable
 documented; `.env` is gitignored — that's where real keys belong, never in
 `.env.example`.
+
+## Chat history (Postgres)
+
+Every chat is saved automatically as you use it (assistant/history.ts) — the
+left sidebar lists them newest-first, click one to reopen it, "+ New chat" to
+start another. Storage is Postgres, run via `docker-compose.yml`'s `db`
+service, with data in a named Docker volume (`assistant_db_data`) — not loose
+files, and not lost on `docker compose down` (only `docker compose down -v`
+deletes it).
+
+```bash
+npm run db:up      # docker compose up -d db — start Postgres (first run creates the volume)
+npm run db:down     # docker compose down — stop, keep data
+docker compose down -v   # stop AND delete all chat history
+```
+
+`assistant/main.ts` connects at boot and exits with a clear error (naming
+`docker compose up -d db`) if it can't reach the database — chat history
+isn't a best-effort feature that silently degrades, so a missing database
+stops the assistant from starting rather than starting broken.
+
+`DATABASE_URL` in `.env` points at a different Postgres instance instead, if
+you'd rather not run the container (see `.env.example`).
 
 ## Switching LLM providers
 
@@ -268,7 +293,9 @@ you need it.
 | Command | What it does |
 |---|---|
 | `npm run build` | Builds all 4 widget bundles (`dist/ui/*.html`) **and** the assistant SPA (`dist/assistant/`). Required before `npm run assistant` will even start. |
-| `npm run assistant` | Starts the assistant on `ASSISTANT_PORT` (default 3002). Reads `.env` once at startup. |
+| `npm run db:up` | `docker compose up -d db` — starts the Postgres container chat history is stored in. |
+| `npm run db:down` | `docker compose down` — stops it (data persists in the `assistant_db_data` volume). |
+| `npm run assistant` | Starts the assistant on `ASSISTANT_PORT` (default 3002). Reads `.env` once at startup; exits with an error if it can't reach Postgres. |
 | `npm run dev:assistant` | Vite dev server for the assistant SPA only (fast frontend iteration) — proxies API calls to a separately-running `npm run assistant`. |
 | `npm run serve` | The original MCP server on port 3001 (independent of the assistant; useful as a test "add server" target, or for Claude Desktop/ChatGPT/Copilot connectors — see [README.md](./README.md)). |
 | `npm run serve:stdio` | Same server over stdio, for a Claude Desktop config entry. |

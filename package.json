@@ -16,7 +16,9 @@
     "serve": "tsx server/main.ts",
     "serve:stdio": "tsx server/main.ts --stdio",
     "assistant": "node --env-file-if-exists=.env --import tsx assistant/main.ts",
-    "dev:assistant": "vite --config vite.assistant.config.ts"
+    "dev:assistant": "vite --config vite.assistant.config.ts",
+    "db:up": "docker compose up -d db",
+    "db:down": "docker compose down"
   },
   "dependencies": {
     "@anthropic-ai/bedrock-sdk": "^0.33.3",
@@ -25,6 +27,7 @@
     "@modelcontextprotocol/sdk": "^1.29.0",
     "cors": "^2.8.5",
     "express": "^5.1.0",
+    "pg": "^8.23.0",
     "react": "^19.2.0",
     "react-dom": "^19.2.0",
     "zod": "^4.1.13"
@@ -33,6 +36,7 @@
     "@types/cors": "^2.8.19",
     "@types/express": "^5.0.0",
     "@types/node": "^22.10.0",
+    "@types/pg": "^8.23.1",
     "@types/react": "^19.2.2",
     "@types/react-dom": "^19.2.2",
     "@vitejs/plugin-react": "^4.3.4",
