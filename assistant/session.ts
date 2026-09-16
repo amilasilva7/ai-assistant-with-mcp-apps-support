@@ -10,14 +10,21 @@ const MAX_SESSIONS = 8;
 export class SessionStore {
   private sessions = new Map<string, Session>();
 
-  create(): Session {
-    const id = crypto.randomUUID();
+  /**
+   * `opts` is how a persisted chat (assistant/history.ts) is reopened: same
+   * id and prior messages, but everything else starts fresh — widgets,
+   * approvals, and any in-flight turn are tied to a live browser tab/iframe
+   * that no longer exists, so restoring them would just be wrong, not
+   * merely incomplete.
+   */
+  create(opts?: { id: string; messages: LlmMessage[]; createdAt: number }): Session {
+    const id = opts?.id ?? crypto.randomUUID();
     const now = Date.now();
     const session: Session = {
       id,
-      createdAt: now,
+      createdAt: opts?.createdAt ?? now,
       lastSeenAt: now,
-      messages: [],
+      messages: opts?.messages ?? [],
       widgets: new Map(),
       modelContext: new Map(),
       approvals: new Map(),
@@ -31,6 +38,11 @@ export class SessionStore {
     const session = this.sessions.get(id);
     if (session) session.lastSeenAt = Date.now();
     return session;
+  }
+
+  /** Called when a persisted chat is deleted, so a stale in-memory session can't resurrect it via a later save. */
+  delete(id: string): void {
+    this.sessions.delete(id);
   }
 
   private evictIfNeeded(): void {

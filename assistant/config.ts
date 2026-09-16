@@ -110,15 +110,21 @@ export function loadConfig(): Config {
           ? "bedrock"
           : "anthropic";
 
-  // Only the selected provider's key is required — this repo runs one
-  // provider at a time (temporary swap, not a fallback chain). Ollama has no
-  // key at all: it's an unauthenticated local server. Bedrock has no key
-  // either — AWS credentials are resolved by the SDK's own standard chain
-  // (env vars, shared config file, SSO, or an instance/task role), not by
-  // this repo's config; only the region is validated here, since the client
-  // throws immediately at construction if it can't determine one.
-  const anthropicApiKey = llmProvider === "anthropic" ? e.requireString("ANTHROPIC_API_KEY") : "";
-  const geminiApiKey = llmProvider === "gemini" ? e.requireString("GEMINI_API_KEY") : "";
+  // Both keys are read unconditionally (not just the boot-selected
+  // provider's) so the UI's runtime model switcher (assistant/llm/manager.ts)
+  // can hand a session over to whichever provider already has a key in
+  // .env, with no restart. Only the *boot-selected* provider's key is
+  // actually required to start — this keeps "set one key, run" working for
+  // someone who never touches the switcher. Ollama has no key at all: it's
+  // an unauthenticated local server. Bedrock has no key either — AWS
+  // credentials are resolved by the SDK's own standard chain (env vars,
+  // shared config file, SSO, or an instance/task role), not by this repo's
+  // config; only the region is validated here, since the client throws
+  // immediately at construction if it can't determine one.
+  const anthropicApiKey = process.env.ANTHROPIC_API_KEY?.trim() || "";
+  const geminiApiKey = process.env.GEMINI_API_KEY?.trim() || "";
+  if (llmProvider === "anthropic" && !anthropicApiKey) e.problems.push("ANTHROPIC_API_KEY is required but not set.");
+  if (llmProvider === "gemini" && !geminiApiKey) e.problems.push("GEMINI_API_KEY is required but not set.");
   const ollamaBaseUrl = process.env.OLLAMA_BASE_URL?.trim() || "http://localhost:11434";
   const awsRegion = process.env.AWS_REGION?.trim() || process.env.AWS_DEFAULT_REGION?.trim() || "";
   if (llmProvider === "bedrock" && !awsRegion) {

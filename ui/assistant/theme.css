@@ -4,67 +4,73 @@
  * `ui/assistant`, not `ui/`), so it cannot `@import "../shared/theme.css"`
  * across that build boundary without pulling widget-only rules (`.viz-*`)
  * into the host shell. Instead this file duplicates the *token names* from
- * `ui/shared/theme.css`'s `:root` block (kept unmodified) so the same palette
- * — and the same `prefers-color-scheme` / `data-theme` toggle convention —
- * applies to both the host chrome and, independently, every widget iframe.
+ * `ui/shared/theme.css`'s `:root` block (kept unmodified) so the same shape
+ * of palette — and the same `prefers-color-scheme` / `data-theme` toggle
+ * convention — applies to both the host chrome and, independently, every
+ * widget iframe. The *values* here are Income's (income.com.sg) published
+ * design tokens (`--color-orange-*`/`--color-blue-*`/`--color-neutral-*` in
+ * their `main.css`), not the shared dataviz reference palette — widget
+ * charts keep the accessibility-validated dataviz colors untouched.
  */
 :root {
   color-scheme: light;
-  --surface-1: #fcfcfb;
+  --surface-1: #f7f7f7;
   --surface-2: #ffffff;
-  --text-primary: #0b0b0b;
-  --text-secondary: #52514e;
-  --text-muted: #898781;
-  --gridline: #e1e0d9;
-  --baseline: #c3c2b7;
-  --border: rgba(11, 11, 11, 0.1);
-  --success: #006300;
-  --danger: #b3261e;
-  --warn: #8a5a00;
+  --text-primary: #262727;
+  --text-secondary: #5b5d5e;
+  --text-muted: #8b8d8e;
+  --gridline: #e0e0e0;
+  --baseline: #d4d4d4;
+  --border: rgba(38, 39, 39, 0.12);
+  --success: #26874b;
+  --danger: #ab2c23;
+  --warn: #9b7b13;
 
-  --series-1: #2a78d6;
-  --series-2: #eb6834;
-  --series-3: #1baf7a;
+  /* Income orange (brand/CTA), Income blue (trust accent), deeper blue (app
+     persona bubble) — see income.com.sg `--color-orange-500`/`--color-blue-500`. */
+  --series-1: #f57100;
+  --series-2: #0087e2;
+  --series-3: #005c9e;
 }
 
 @media (prefers-color-scheme: dark) {
   :root:where(:not([data-theme="light"])) {
     color-scheme: dark;
-    --surface-1: #1a1a19;
-    --surface-2: #232322;
+    --surface-1: #1c1c1c;
+    --surface-2: #262727;
     --text-primary: #ffffff;
-    --text-secondary: #c3c2b7;
-    --text-muted: #898781;
-    --gridline: #2c2c2a;
-    --baseline: #383835;
-    --border: rgba(255, 255, 255, 0.1);
-    --success: #0ca30c;
-    --danger: #ff6b60;
-    --warn: #e0a942;
+    --text-secondary: #d4d4d4;
+    --text-muted: #8b8d8e;
+    --gridline: #373939;
+    --baseline: #494b4c;
+    --border: rgba(255, 255, 255, 0.12);
+    --success: #4bce97;
+    --danger: #e48780;
+    --warn: #edc536;
 
-    --series-1: #3987e5;
-    --series-2: #d95926;
-    --series-3: #199e70;
+    --series-1: #ff9f4e;
+    --series-2: #6bbbf5;
+    --series-3: #0087e2;
   }
 }
 
 :root[data-theme="dark"] {
   color-scheme: dark;
-  --surface-1: #1a1a19;
-  --surface-2: #232322;
+  --surface-1: #1c1c1c;
+  --surface-2: #262727;
   --text-primary: #ffffff;
-  --text-secondary: #c3c2b7;
-  --text-muted: #898781;
-  --gridline: #2c2c2a;
-  --baseline: #383835;
-  --border: rgba(255, 255, 255, 0.1);
-  --success: #0ca30c;
-  --danger: #ff6b60;
-  --warn: #e0a942;
+  --text-secondary: #d4d4d4;
+  --text-muted: #8b8d8e;
+  --gridline: #373939;
+  --baseline: #494b4c;
+  --border: rgba(255, 255, 255, 0.12);
+  --success: #4bce97;
+  --danger: #e48780;
+  --warn: #edc536;
 
-  --series-1: #3987e5;
-  --series-2: #d95926;
-  --series-3: #199e70;
+  --series-1: #ff9f4e;
+  --series-2: #6bbbf5;
+  --series-3: #0087e2;
 }
 
 * {
@@ -88,7 +94,7 @@ body,
 
 body {
   margin: 0;
-  font-family: system-ui, -apple-system, "Segoe UI", sans-serif;
+  font-family: "Ubuntu", Calibri, system-ui, -apple-system, "Segoe UI", sans-serif;
   background: var(--surface-1);
   color: var(--text-primary);
 }
@@ -112,14 +118,15 @@ a {
   align-items: center;
   justify-content: space-between;
   padding: 10px 16px;
-  border-bottom: 1px solid var(--border);
+  border-bottom: 3px solid var(--series-1);
   background: var(--surface-2);
 }
 
 .assistant-header h1 {
   font-size: 15px;
-  font-weight: 600;
+  font-weight: 700;
   margin: 0;
+  color: var(--series-1);
 }
 
 .assistant-panel-toggle {
@@ -130,10 +137,44 @@ a {
   color: var(--text-primary);
   padding: 6px 12px;
   cursor: pointer;
+  transition: border-color 120ms, color 120ms;
+}
+
+.assistant-panel-toggle:hover {
+  border-color: var(--series-1);
+  color: var(--series-1);
+}
+
+.assistant-header-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.assistant-new-chat-button {
+  appearance: none;
+  border: 1px solid var(--series-1);
+  border-radius: 8px;
+  background: transparent;
+  color: var(--series-1);
+  padding: 6px 12px;
+  cursor: pointer;
+  font-weight: 600;
+  transition: background 120ms, color 120ms;
+}
+
+.assistant-new-chat-button:hover:not(:disabled) {
+  background: var(--series-1);
+  color: white;
+}
+
+.assistant-new-chat-button:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
 }
 
 .assistant-build-warning {
-  background: rgba(138, 90, 0, 0.12);
+  background: rgba(155, 123, 19, 0.12);
   color: var(--warn);
   padding: 8px 16px;
   font-size: 12px;
@@ -233,6 +274,88 @@ a {
   padding: 0 12px 12px;
 }
 
+.assistant-history-empty,
+.assistant-history-error {
+  font-size: 12px;
+  color: var(--text-muted);
+  margin: 0;
+}
+
+.assistant-history-error {
+  color: var(--danger);
+}
+
+.assistant-history-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  max-height: 320px;
+  overflow-y: auto;
+}
+
+.assistant-history-item {
+  display: flex;
+  align-items: stretch;
+  gap: 2px;
+  border-radius: 8px;
+}
+
+.assistant-history-item-active {
+  background: rgba(245, 113, 0, 0.1);
+}
+
+.assistant-history-open {
+  flex: 1;
+  min-width: 0;
+  appearance: none;
+  border: none;
+  background: transparent;
+  color: var(--text-primary);
+  padding: 6px 8px;
+  cursor: pointer;
+  text-align: left;
+  border-radius: 8px;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.assistant-history-open:hover {
+  background: var(--surface-1);
+}
+
+.assistant-history-title {
+  font-size: 12px;
+  font-weight: 600;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.assistant-history-date {
+  font-size: 10px;
+  color: var(--text-muted);
+}
+
+.assistant-history-delete {
+  appearance: none;
+  border: none;
+  background: transparent;
+  cursor: pointer;
+  padding: 6px 8px;
+  font-size: 12px;
+  border-radius: 8px;
+  opacity: 0.6;
+}
+
+.assistant-history-delete:hover {
+  opacity: 1;
+  background: rgba(171, 44, 35, 0.08);
+}
+
 .assistant-transcript {
   flex: 1;
   /* Flex items default to min-height:auto, i.e. "at least as tall as my
@@ -330,6 +453,34 @@ a {
   letter-spacing: 0.04em;
   opacity: 0.8;
   margin-bottom: 2px;
+}
+
+.assistant-copy-button {
+  appearance: none;
+  border: none;
+  background: transparent;
+  display: block;
+  margin-top: 4px;
+  padding: 2px 0;
+  font-size: 11px;
+  cursor: pointer;
+  opacity: 0.6;
+  transition: opacity 120ms;
+}
+
+.assistant-copy-button:hover,
+.assistant-copy-button:focus-visible {
+  opacity: 1;
+  text-decoration: underline;
+}
+
+.assistant-bubble-user .assistant-copy-button {
+  color: rgba(255, 255, 255, 0.85);
+  text-align: right;
+}
+
+.assistant-bubble-assistant .assistant-copy-button {
+  color: var(--text-muted);
 }
 
 .assistant-bubble-assistant {
@@ -512,7 +663,7 @@ a {
   border: 1px solid var(--warn);
   border-radius: 10px;
   padding: 10px 12px;
-  background: rgba(138, 90, 0, 0.08);
+  background: rgba(155, 123, 19, 0.08);
   font-size: 13px;
 }
 
@@ -544,12 +695,12 @@ a {
 }
 
 .assistant-notice-info {
-  background: rgba(42, 120, 214, 0.1);
+  background: rgba(0, 135, 226, 0.1);
   color: var(--text-secondary);
 }
 
 .assistant-notice-warn {
-  background: rgba(138, 90, 0, 0.12);
+  background: rgba(155, 123, 19, 0.12);
   color: var(--warn);
 }
 
@@ -573,7 +724,7 @@ a {
   border: 1px solid var(--danger);
   border-radius: 8px;
   padding: 8px 12px;
-  background: rgba(179, 38, 30, 0.06);
+  background: rgba(171, 44, 35, 0.06);
 }
 
 .assistant-error-code {
@@ -818,6 +969,104 @@ a {
   cursor: not-allowed;
 }
 
+.assistant-model-switcher {
+  max-width: 760px;
+  margin: 0 auto;
+  padding: 0 16px 14px;
+  font-size: 12px;
+}
+
+.assistant-model-switcher-loading {
+  color: var(--text-muted);
+  text-align: center;
+}
+
+.assistant-model-switcher-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+}
+
+.assistant-model-switcher-label {
+  color: var(--text-muted);
+  font-weight: 600;
+}
+
+.assistant-model-switcher-select {
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--surface-2);
+  color: var(--text-primary);
+  padding: 5px 8px;
+  font: inherit;
+  font-size: 12px;
+  max-width: 100%;
+}
+
+.assistant-model-switcher-select:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+.assistant-model-switcher-status {
+  color: var(--text-muted);
+}
+
+.assistant-model-switcher-ok {
+  color: var(--success);
+}
+
+.assistant-model-switcher-custom {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-top: 8px;
+}
+
+.assistant-model-switcher-custom input {
+  flex: 1;
+  min-width: 160px;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  padding: 6px 8px;
+  font: inherit;
+  font-size: 12px;
+  background: var(--surface-1);
+  color: var(--text-primary);
+}
+
+.assistant-model-switcher-custom button {
+  appearance: none;
+  border: none;
+  border-radius: 6px;
+  padding: 6px 10px;
+  cursor: pointer;
+  font-weight: 600;
+  font-size: 12px;
+}
+
+.assistant-model-switcher-custom button[type="submit"] {
+  background: var(--series-1);
+  color: white;
+}
+
+.assistant-model-switcher-custom button[type="submit"]:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.assistant-model-switcher-custom button[type="button"] {
+  background: transparent;
+  border: 1px solid var(--border);
+  color: var(--text-secondary);
+}
+
+.assistant-model-switcher-hint {
+  margin-top: 6px;
+  color: var(--text-muted);
+}
+
 .assistant-boot-error {
   padding: 40px;
   font-family: system-ui, sans-serif;
@@ -833,6 +1082,10 @@ a {
 
   .assistant-composer {
     padding: 10px 10px 16px;
+  }
+
+  .assistant-model-switcher {
+    padding: 0 10px 14px;
   }
 
   .assistant-sidebar {

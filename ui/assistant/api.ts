@@ -86,6 +86,38 @@ export interface PublicServerRecord {
   }>;
 }
 
+export type LlmProviderId = "anthropic" | "gemini" | "ollama" | "bedrock";
+
+export interface LlmProviderInfo {
+  id: LlmProviderId;
+  label: string;
+  configured: boolean;
+  reason?: string;
+  defaultModel: string;
+  suggestedModels: string[];
+}
+
+export interface LlmState {
+  provider: LlmProviderId;
+  model: string;
+}
+
+// Mirrors assistant/llm/provider.ts's LlmMessage — same deliberate
+// duplication rationale as ContentBlockLike/TurnEvent above (see this
+// file's header comment): a chat's persisted history is these blocks
+// verbatim, and state.ts's messagesToTranscript() converts them into
+// TranscriptItems for display.
+export type LlmUserBlockLike = { type: "text"; text: string } | { type: "tool_result"; toolUseId: string; isError?: boolean; text: string };
+export type LlmAssistantBlockLike = { type: "text"; text: string } | { type: "tool_use"; id: string; name: string; input: Record<string, unknown> };
+export type LlmMessageLike = { role: "user"; content: LlmUserBlockLike[] } | { role: "assistant"; content: LlmAssistantBlockLike[] };
+
+export interface ChatSummary {
+  id: string;
+  title: string;
+  createdAt: number;
+  updatedAt: number;
+}
+
 async function asJson<T>(res: Response): Promise<T> {
   if (!res.ok) {
     let body: unknown;
@@ -107,9 +139,30 @@ export async function createSession(): Promise<string> {
   return sessionId;
 }
 
-export async function getConfig(): Promise<{ model: string; widgetInitTimeoutMs: number; maxToolIterations: number; buildWarnings: string[] }> {
+export async function getConfig(): Promise<{ model: string; llmProvider: LlmProviderId; widgetInitTimeoutMs: number; maxToolIterations: number; buildWarnings: string[] }> {
   const res = await fetch("/api/config");
   return asJson(res);
+}
+
+export async function getLlmSettings(): Promise<{ current: LlmState; providers: LlmProviderInfo[] }> {
+  const res = await fetch("/api/llm");
+  return asJson(res);
+}
+
+export async function setLlmSettings(provider: LlmProviderId, model?: string): Promise<LlmState> {
+  const res = await fetch("/api/llm", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ provider, model }),
+  });
+  const { current } = await asJson<{ current: LlmState }>(res);
+  return current;
+}
+
+export async function getOllamaModels(): Promise<string[]> {
+  const res = await fetch("/api/llm/ollama-models");
+  const { models } = await asJson<{ models: string[] }>(res);
+  return models;
 }
 
 export async function listServers(): Promise<PublicServerRecord[]> {
@@ -143,6 +196,22 @@ export async function reconnectServer(id: string): Promise<PublicServerRecord> {
   const res = await fetch(`/api/servers/${encodeURIComponent(id)}/reconnect`, { method: "POST" });
   const { server } = await asJson<{ server: PublicServerRecord }>(res);
   return server;
+}
+
+export async function listChats(): Promise<ChatSummary[]> {
+  const res = await fetch("/api/chats");
+  const { chats } = await asJson<{ chats: ChatSummary[] }>(res);
+  return chats;
+}
+
+export async function openChat(id: string): Promise<{ sessionId: string; title: string; messages: LlmMessageLike[] }> {
+  const res = await fetch(`/api/chats/${encodeURIComponent(id)}/open`, { method: "POST" });
+  return asJson(res);
+}
+
+export async function deleteChat(id: string): Promise<void> {
+  const res = await fetch(`/api/chats/${encodeURIComponent(id)}`, { method: "DELETE" });
+  if (!res.ok) await asJson(res);
 }
 
 export class ChatConflictError extends Error {}

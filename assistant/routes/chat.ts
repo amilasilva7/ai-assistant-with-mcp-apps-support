@@ -1,13 +1,14 @@
 import { Router } from "express";
 import type { Config } from "../config.js";
-import type { LlmProvider } from "../llm/provider.js";
+import type { HistoryStore } from "../history.js";
+import type { LlmManager } from "../llm/manager.js";
 import { runTurn, resolveApproval } from "../loop.js";
 import type { ServerRegistry } from "../registry.js";
 import type { SessionStore } from "../session.js";
 import type { ApprovalDecision } from "../types.js";
 import type { TurnEvent } from "../turnEvents.js";
 
-export function createChatRouter(deps: { sessions: SessionStore; registry: ServerRegistry; llm: LlmProvider; config: Config }): Router {
+export function createChatRouter(deps: { sessions: SessionStore; registry: ServerRegistry; llm: LlmManager; config: Config; history: HistoryStore }): Router {
   const router = Router();
 
   router.post("/chat", async (req, res) => {
@@ -59,7 +60,7 @@ export function createChatRouter(deps: { sessions: SessionStore; registry: Serve
       await runTurn({
         session,
         registry: deps.registry,
-        llm: deps.llm,
+        llm: deps.llm.getProvider(),
         config: deps.config,
         prompt,
         turnId,
@@ -70,6 +71,12 @@ export function createChatRouter(deps: { sessions: SessionStore; registry: Serve
       // defense so a bug there cannot crash the process (NFR-Reliability-1).
       emit({ t: "error", code: "LLM_ERROR", message: err instanceof Error ? err.message : String(err) });
       emit({ t: "turn_end", stopReason: "error", iterations: 0 });
+    } finally {
+      // Persisted regardless of outcome (including a turn that errored
+      // partway through) so a chat's history on disk never falls behind what
+      // the model actually saw — the same guarantee the design gives the
+      // in-memory session.messages array itself.
+      deps.history.save(session.id, session.messages, session.createdAt);
     }
     res.end();
     void source; // source is informational only; both paths share the same policy above.

@@ -8,11 +8,34 @@
  * user is already near the bottom — scrolling up to reread earlier messages
  * is never yanked back down mid-stream.
  */
-import { useEffect, useRef } from "react";
+import { useEffect, useRef, useState } from "react";
 import type { ApprovalDecision, TranscriptItem } from "../state";
 import { ErrorMessage } from "./ErrorMessage";
 import { MiniMarkdown } from "./MiniMarkdown";
 import { ToolResultCard } from "./ToolResultCard";
+
+/** Copy-to-clipboard for one chat message (user prompt or assistant reply). */
+function CopyButton({ text }: { text: string }) {
+  const [copied, setCopied] = useState(false);
+
+  async function handleCopy() {
+    try {
+      await navigator.clipboard.writeText(text);
+      setCopied(true);
+      setTimeout(() => setCopied(false), 1500);
+    } catch {
+      // Clipboard access can be denied (permissions) or unavailable (no
+      // secure context) — there's no useful recovery, so fail silently
+      // rather than show an error for a purely convenience feature.
+    }
+  }
+
+  return (
+    <button type="button" className="assistant-copy-button" onClick={() => void handleCopy()} aria-label="Copy message">
+      {copied ? "Copied ✓" : "Copy"}
+    </button>
+  );
+}
 
 const SUGGESTIONS = [
   "Search for available health insurance products",
@@ -85,12 +108,14 @@ export function Transcript(props: TranscriptProps) {
               <div className={`assistant-bubble assistant-bubble-user${item.source === "app" ? " assistant-bubble-app" : ""}`}>
                 {item.source === "app" && <div className="assistant-bubble-label">From widget</div>}
                 <p>{item.text}</p>
+                <CopyButton text={item.text} />
               </div>
             )}
             {item.kind === "assistant_text" && (
               <div className="assistant-bubble assistant-bubble-assistant">
                 <MiniMarkdown text={item.text} />
                 {item.streaming && <span className="assistant-cursor" aria-hidden="true" />}
+                {!item.streaming && <CopyButton text={item.text} />}
               </div>
             )}
             {item.kind === "tool_call" && (

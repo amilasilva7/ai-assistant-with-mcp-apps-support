@@ -12,12 +12,14 @@
 import { useEffect, useReducer, useRef, useState } from "react";
 import * as api from "./api";
 import { ChatConflictError } from "./api";
+import { ChatHistoryPanel } from "./components/ChatHistoryPanel";
 import { Composer } from "./components/Composer";
+import { ModelSwitcher } from "./components/ModelSwitcher";
 import { PanelSection } from "./components/PanelSection";
 import { ServersPanel } from "./components/ServersPanel";
 import { Transcript } from "./components/Transcript";
 import type { ApprovalDecision } from "./state";
-import { initialState, reducer } from "./state";
+import { initialState, messagesToTranscript, reducer } from "./state";
 
 interface AssistantConfig {
   model: string;
@@ -37,6 +39,7 @@ export function App() {
   const [config, setConfig] = useState<AssistantConfig | null>(null);
   const [bootError, setBootError] = useState<string | null>(null);
   const [panelOpen, setPanelOpen] = useState(false);
+  const [historyRefreshKey, setHistoryRefreshKey] = useState(0);
   const lastWidgetMessageAt = useRef<Map<string, number>>(new Map());
 
   useEffect(() => {
@@ -64,11 +67,39 @@ export function App() {
     } catch (err) {
       const message = err instanceof ChatConflictError ? err.message : err instanceof Error ? err.message : String(err);
       dispatch({ type: "turn_failed", message });
+    } finally {
+      // The backend persists this chat's history on every turn end
+      // (routes/chat.ts), success or not — bump the panel's refresh key so
+      // its title/position catches up without it having to know about turns.
+      setHistoryRefreshKey((k) => k + 1);
     }
   }
 
   function handleSubmit(text: string) {
     void runTurn(text, "user");
+  }
+
+  async function handleNewChat() {
+    if (state.turnActive) return;
+    try {
+      const sid = await api.createSession();
+      setSessionId(sid);
+      dispatch({ type: "reset" });
+    } catch (err) {
+      setBootError(err instanceof Error ? err.message : String(err));
+    }
+  }
+
+  async function handleOpenChat(id: string) {
+    if (state.turnActive) return;
+    try {
+      const { sessionId: sid, messages } = await api.openChat(id);
+      setSessionId(sid);
+      dispatch({ type: "load_chat", items: messagesToTranscript(messages) });
+      setPanelOpen(false);
+    } catch (err) {
+      dispatch({ type: "turn_failed", message: err instanceof Error ? err.message : String(err) });
+    }
   }
 
   function handleCancel() {
@@ -104,9 +135,14 @@ export function App() {
     <div className="assistant-shell">
       <header className="assistant-header">
         <h1>income-mcp assistant</h1>
-        <button type="button" className="assistant-panel-toggle" aria-expanded={panelOpen} onClick={() => setPanelOpen((v) => !v)}>
-          {panelOpen ? "Hide panel ✕" : "Panel ☰"}
-        </button>
+        <div className="assistant-header-actions">
+          <button type="button" className="assistant-new-chat-button" disabled={state.turnActive} onClick={() => void handleNewChat()}>
+            + New chat
+          </button>
+          <button type="button" className="assistant-panel-toggle" aria-expanded={panelOpen} onClick={() => setPanelOpen((v) => !v)}>
+            {panelOpen ? "Hide panel ✕" : "Panel ☰"}
+          </button>
+        </div>
       </header>
       {config && config.buildWarnings.length > 0 && (
         <div className="assistant-build-warning" role="status">
@@ -128,6 +164,7 @@ export function App() {
             onSuggestion={handleSubmit}
           />
           <Composer disabled={!sessionId || state.turnActive} turnActive={state.turnActive} onSubmit={handleSubmit} onCancel={handleCancel} />
+          <ModelSwitcher />
         </main>
 
         {panelOpen && (
@@ -137,6 +174,9 @@ export function App() {
             <div className="assistant-sidebar-backdrop" onClick={() => setPanelOpen(false)} />
             <aside className="assistant-sidebar">
               {/* Future features are added here as sibling PanelSections. */}
+              <PanelSection title="Chat history">
+                <ChatHistoryPanel activeChatId={sessionId} refreshKey={historyRefreshKey} onOpen={handleOpenChat} onDeletedActive={handleNewChat} />
+              </PanelSection>
               <PanelSection title="MCP servers">
                 <ServersPanel />
               </PanelSection>
