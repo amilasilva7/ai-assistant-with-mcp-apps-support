@@ -377,9 +377,15 @@ a {
   text-align: left;
 }
 
-.assistant-markdown ul {
+.assistant-markdown ul,
+.assistant-markdown ol {
   margin: 6px 0;
   padding-left: 20px;
+}
+
+.assistant-markdown li > ul,
+.assistant-markdown li > ol {
+  margin: 2px 0;
 }
 
 /* The tool-call card: status, an optional approval prompt, the chart (inline
