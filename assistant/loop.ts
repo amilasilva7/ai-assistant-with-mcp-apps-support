@@ -298,6 +298,7 @@ export async function runTurn(params: RunTurnParams): Promise<void> {
 
       let blocks: LlmAssistantBlock[];
       try {
+        emit({ t: "model_start", phase: iterations === 1 ? "thinking" : "rethinking" });
         const result = await llm.streamTurn(
           {
             system: buildSystemPrompt(servers),
@@ -363,6 +364,7 @@ export async function runTurn(params: RunTurnParams): Promise<void> {
     if (stopReason === "max_iterations" || stopReason === "max_calls") {
       emit({ t: "notice", level: "warn", message: "Reached this turn's tool-call limit; asking the model to summarize what it has so far." });
       try {
+        emit({ t: "model_start", phase: "summarizing" });
         const servers = registry.list();
         const result = await llm.streamTurn(
           { system: buildSystemPrompt(servers), messages: trimHistory(session.messages, config.maxHistoryMessages), tools: [], signal: abort.signal },

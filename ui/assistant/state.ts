@@ -8,7 +8,7 @@
  * `turn_end` always arrives last; any tool call still pending at that point is
  * marked `cancelled` so its `WidgetFrame` gets `sendToolCancelled`.
  */
-import type { ContentBlockLike, StopReason, Trust, TurnEvent } from "./api";
+import type { ContentBlockLike, ModelCallPhase, StopReason, Trust, TurnEvent } from "./api";
 
 export interface UserItem {
   kind: "user";
@@ -151,10 +151,33 @@ function stopReasonLabel(reason: StopReason): string {
   }
 }
 
+function modelPhaseLabel(phase: ModelCallPhase): string {
+  switch (phase) {
+    case "thinking":
+      return "Thinking…";
+    case "rethinking":
+      return "Rethinking with the tool results…";
+    case "summarizing":
+      return "Summarizing what it has so far…";
+    default:
+      return "Thinking…";
+  }
+}
+
 function applyTurnEvent(state: AppState, event: TurnEvent): AppState {
   switch (event.t) {
     case "turn_start":
       return { ...state, liveStatus: "Thinking…" };
+
+    // Fires right before every model call (design note in turnEvents.ts).
+    // Iteration 1 overlaps with `turn_start`'s "Thinking…"; iterations after
+    // a round of tool calls is the gap neither `text_delta` nor
+    // `tool_call_start` covers, since the model hasn't produced anything yet
+    // — clearing `streamingAssistantId` here also means text that follows a
+    // tool call starts a fresh bubble instead of silently merging into
+    // whatever text bubble preceded the tool call.
+    case "model_start":
+      return { ...state, streamingAssistantId: null, liveStatus: modelPhaseLabel(event.phase) };
 
     case "text_delta": {
       if (state.streamingAssistantId) {
@@ -188,7 +211,7 @@ function applyTurnEvent(state: AppState, event: TurnEvent): AppState {
       return {
         ...state,
         transcript: [...state.transcript, item],
-        liveStatus: `Calling ${event.serverName} · ${event.toolName}…`,
+        liveStatus: `Talking to ${event.serverName} · ${event.toolName}…`,
       };
     }
 

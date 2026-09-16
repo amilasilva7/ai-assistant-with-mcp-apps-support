@@ -31,8 +31,11 @@ export type ErrorCode =
 
 export type StopReason = "end_turn" | "max_iterations" | "max_calls" | "timeout" | "cancelled" | "error";
 
+export type ModelCallPhase = "thinking" | "rethinking" | "summarizing";
+
 export type TurnEvent =
   | { t: "turn_start"; turnId: string }
+  | { t: "model_start"; phase: ModelCallPhase }
   | { t: "text_delta"; text: string }
   | {
       t: "tool_call_start";
