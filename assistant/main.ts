@@ -3,7 +3,7 @@
  *   npm run serve:assistant  -> http://127.0.0.1:3002
  *
  * Startup order follows design §3.4: config -> SPA build check (fatal) ->
- * registry -> bind guard -> listen.
+ * database connect (fatal) -> registry -> bind guard -> listen.
  */
 import { existsSync } from "node:fs";
 import path from "node:path";
@@ -24,6 +24,20 @@ import { createHistoryRouter } from "./routes/history.js";
 
 const ROOT_DIR = path.join(import.meta.dirname, "..");
 const SPA_DIR = path.join(ROOT_DIR, "dist", "assistant");
+
+/**
+ * `pg`'s connection-refused failure is an `AggregateError` with an empty
+ * top-level `.message` (the real detail — e.g. `ECONNREFUSED` — is on
+ * `.code` and inside `.errors`), so `err.message` alone renders as blank.
+ * This surfaces whatever's actually informative.
+ */
+function describeDbError(err: unknown): string {
+  if (!(err instanceof Error)) return String(err);
+  const code = (err as { code?: string }).code;
+  const nested = (err as { errors?: unknown[] }).errors;
+  const parts = [err.message, code, ...(Array.isArray(nested) ? nested.map((e) => (e instanceof Error ? e.message : String(e))) : [])].filter(Boolean);
+  return parts.length > 0 ? parts.join(" — ") : err.name;
+}
 
 // The assistant's own SPA CSP (review R-6: the design left this dangling).
 // It must permit the `srcdoc` child iframes the host creates for widgets —
@@ -72,6 +86,28 @@ async function main() {
     process.exit(1);
   }
 
+  const history = new HistoryStore(config.databaseUrl);
+  try {
+    await history.init();
+  } catch (err) {
+    // Fatal, not swallowed-and-continue (NFR-Reliability-1 is about *tool
+    // calls* failing mid-turn, not the assistant's own storage layer being
+    // unreachable at boot) — every route below assumes the chats table
+    // exists, so starting up anyway would just move this failure to the
+    // first chat message instead of surfacing it here with a fix.
+    console.error(
+      [
+        "",
+        "*** Could not connect to the assistant's Postgres database. ***",
+        `  DATABASE_URL: ${config.databaseUrl}`,
+        "  If it isn't running yet: docker compose up -d db",
+        `  Underlying error: ${describeDbError(err)}`,
+        "",
+      ].join("\n"),
+    );
+    process.exit(1);
+  }
+
   if (config.bind !== "127.0.0.1" && config.bind !== "localhost") {
     console.warn(
       [
@@ -100,7 +136,6 @@ async function main() {
   const llmManager = new LlmManager(config);
   console.log(`[main] LLM provider: ${config.llmProvider} (${config.model})`);
   const sessions = new SessionStore();
-  const history = new HistoryStore();
 
   const app = express();
   app.use(express.json({ limit: "1mb" }));

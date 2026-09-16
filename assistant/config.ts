@@ -46,6 +46,7 @@ export interface Config {
   allowRemote: boolean;
   publicOrigin: string | null;
   seedServers: SeedServer[];
+  databaseUrl: string;
   maxToolIterations: number;
   maxToolCallsPerTurn: number;
   turnTimeoutMs: number;
@@ -169,6 +170,12 @@ export function loadConfig(): Config {
     }
   }
 
+  // Matches docker-compose.yml's `db` service (user/password/db name
+  // "assistant", host port 5433) so `docker compose up -d db` + `npm run
+  // assistant` works with zero .env changes. Override if you point this at
+  // a different Postgres instance.
+  const databaseUrl = process.env.DATABASE_URL?.trim() || "postgres://assistant:assistant@localhost:5433/assistant";
+
   const seedServers = e.json<SeedServer[]>("ASSISTANT_SERVERS", []);
   if (!Array.isArray(seedServers)) {
     e.problems.push("ASSISTANT_SERVERS must be a JSON array.");
@@ -192,6 +199,7 @@ export function loadConfig(): Config {
     allowRemote,
     publicOrigin,
     seedServers: Array.isArray(seedServers) ? seedServers : [],
+    databaseUrl,
     maxToolIterations: e.int("ASSISTANT_MAX_TOOL_ITERATIONS", 8),
     maxToolCallsPerTurn: e.int("ASSISTANT_MAX_TOOL_CALLS_PER_TURN", 16),
     turnTimeoutMs: e.int("ASSISTANT_TURN_TIMEOUT_MS", 120_000),

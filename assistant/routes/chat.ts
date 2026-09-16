@@ -76,7 +76,7 @@ export function createChatRouter(deps: { sessions: SessionStore; registry: Serve
       // partway through) so a chat's history on disk never falls behind what
       // the model actually saw — the same guarantee the design gives the
       // in-memory session.messages array itself.
-      deps.history.save(session.id, session.messages, session.createdAt);
+      await deps.history.save(session.id, session.messages, session.createdAt);
     }
     res.end();
     void source; // source is informational only; both paths share the same policy above.

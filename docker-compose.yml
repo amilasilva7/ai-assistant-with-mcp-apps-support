@@ -1,0 +1,38 @@
+# Postgres for the assistant's chat history (assistant/history.ts). This is
+# the only persistent state the assistant itself owns — everything else
+# (live sessions, widgets, approvals) is intentionally still in-memory (see
+# session.ts). Data lives in the named volume below, not bind-mounted into
+# the repo, so it survives `docker compose down` and container
+# recreation/image upgrades; only `docker compose down -v` (or deleting the
+# volume explicitly) actually discards it.
+#
+# Usage:
+#   docker compose up -d db     # start (first run creates the volume)
+#   docker compose down         # stop, keep data
+#   docker compose down -v      # stop AND delete all chat history
+#
+# assistant/config.ts's DATABASE_URL default matches this file's port/user/
+# password/db name — override either side together if you change one.
+services:
+  db:
+    image: postgres:16-alpine
+    container_name: income-mcp-assistant-db
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: assistant
+      POSTGRES_PASSWORD: assistant
+      POSTGRES_DB: assistant
+    ports:
+      # Host port 5433 (not the default 5432) to avoid colliding with a
+      # Postgres instance you might already be running locally.
+      - "5433:5432"
+    volumes:
+      - assistant_db_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U assistant -d assistant"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+volumes:
+  assistant_db_data:

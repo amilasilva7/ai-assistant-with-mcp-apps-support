@@ -122,10 +122,34 @@ a {
   background: var(--surface-2);
 }
 
+.assistant-header-start {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
 .assistant-header h1 {
   font-size: 15px;
   font-weight: 700;
   margin: 0;
+  color: var(--series-1);
+}
+
+.assistant-history-toggle {
+  appearance: none;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: transparent;
+  color: var(--text-primary);
+  padding: 6px 10px;
+  cursor: pointer;
+  font-size: 13px;
+  line-height: 1;
+  transition: border-color 120ms, color 120ms;
+}
+
+.assistant-history-toggle:hover {
+  border-color: var(--series-1);
   color: var(--series-1);
 }
 
@@ -186,6 +210,79 @@ a {
   display: flex;
   min-height: 0;
   position: relative;
+}
+
+/* Left chat-history sidebar (ChatGPT/Claude-style): an in-flow column on
+   desktop that pushes the chat aside rather than covering it, collapsing to
+   width:0 instead of unmounting so ChatHistoryPanel's own fetched list state
+   survives a collapse. Below 640px (media query at the bottom of this file)
+   it switches to the same overlay+backdrop pattern as .assistant-sidebar on
+   the right, since there's no room to share the screen with the chat. */
+.assistant-history-sidebar {
+  flex: none;
+  width: 260px;
+  min-height: 0;
+  border-right: 1px solid var(--border);
+  background: var(--surface-2);
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  transition: width 160ms ease;
+}
+
+.assistant-history-sidebar-collapsed {
+  width: 0;
+  border-right-color: transparent;
+}
+
+.assistant-history-sidebar-header {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 10px;
+  border-bottom: 1px solid var(--border);
+}
+
+.assistant-history-collapse {
+  appearance: none;
+  flex: none;
+  width: 28px;
+  height: 28px;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  background: transparent;
+  color: var(--text-secondary);
+  cursor: pointer;
+  font-size: 14px;
+  line-height: 1;
+}
+
+.assistant-history-collapse:hover {
+  border-color: var(--series-1);
+  color: var(--series-1);
+}
+
+.assistant-history-sidebar .assistant-new-chat-button {
+  flex: 1;
+  min-width: 0;
+}
+
+.assistant-history-sidebar-body {
+  flex: 1;
+  min-height: 0;
+  min-width: 260px;
+  overflow-y: auto;
+  padding: 8px;
+}
+
+/* Only meaningful below 640px — see the media query at the bottom of this
+   file, which is the only place this becomes visible. */
+.assistant-history-backdrop {
+  position: absolute;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.25);
+  z-index: 5;
+  display: none;
 }
 
 /* One chat column — text and widgets scroll together in Transcript.tsx (see
@@ -292,8 +389,6 @@ a {
   display: flex;
   flex-direction: column;
   gap: 4px;
-  max-height: 320px;
-  overflow-y: auto;
 }
 
 .assistant-history-item {
@@ -1091,5 +1186,28 @@ a {
   .assistant-sidebar {
     width: 100%;
     max-width: 100%;
+  }
+
+  /* The left history sidebar switches from an in-flow column to an overlay
+     here — there's no room to share the screen with the chat at this width,
+     the same reasoning that keeps .assistant-sidebar an overlay always. */
+  .assistant-history-sidebar {
+    position: absolute;
+    top: 0;
+    bottom: 0;
+    left: 0;
+    z-index: 6;
+    width: 85vw;
+    max-width: 300px;
+    box-shadow: 8px 0 24px rgba(0, 0, 0, 0.12);
+  }
+
+  .assistant-history-sidebar-collapsed {
+    width: 0;
+    box-shadow: none;
+  }
+
+  .assistant-history-backdrop {
+    display: block;
   }
 }
