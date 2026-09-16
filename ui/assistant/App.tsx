@@ -198,6 +198,7 @@ export function App() {
           <Transcript
             items={state.transcript}
             liveStatus={state.liveStatus}
+            showStatusIndicator={state.turnActive && state.streamingAssistantId === null}
             sessionId={sessionId}
             widgetInitTimeoutMs={config?.widgetInitTimeoutMs ?? 5000}
             onApprove={handleApprove}

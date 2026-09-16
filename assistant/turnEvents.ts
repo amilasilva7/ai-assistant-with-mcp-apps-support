@@ -17,16 +17,25 @@ export type ErrorCode =
 
 export type StopReason = "end_turn" | "max_iterations" | "max_calls" | "timeout" | "cancelled" | "error";
 
+export type ModelCallPhase = "thinking" | "rethinking" | "summarizing";
+
 /**
  * NDJSON turn stream event union (design §5.2), extended with `tool_approved`
- * (review R-2 correction): for tools on `trust: "user"` servers,
- * `tool_call_start` never carries a *mountable* widget until approval has
- * been granted — `mountable` tells the frontend whether it may fetch/mount
- * the widget iframe yet, and `tool_approved` flips it once the user
- * approves. Built-in-server tools are `mountable: true` from the start.
+ * (review R-2 correction) and `model_start`:
+ *  - `tool_approved`: for tools on `trust: "user"` servers, `tool_call_start`
+ *    never carries a *mountable* widget until approval has been granted —
+ *    `mountable` tells the frontend whether it may fetch/mount the widget
+ *    iframe yet, and `tool_approved` flips it once the user approves.
+ *    Built-in-server tools are `mountable: true` from the start.
+ *  - `model_start`: fires right before every model call, so the frontend can
+ *    show a live "Thinking… / Rethinking… / Summarizing…" indicator during
+ *    the gap between the model deciding to call tools and it producing its
+ *    next output — a gap `text_delta`/`tool_call_start` alone don't cover,
+ *    since neither fires until the model has actually produced something.
  */
 export type TurnEvent =
   | { t: "turn_start"; turnId: string }
+  | { t: "model_start"; phase: ModelCallPhase }
   | { t: "text_delta"; text: string }
   | {
       t: "tool_call_start";

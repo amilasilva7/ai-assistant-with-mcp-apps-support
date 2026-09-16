@@ -12,6 +12,7 @@ import { useEffect, useRef, useState } from "react";
 import type { ApprovalDecision, TranscriptItem } from "../state";
 import { ErrorMessage } from "./ErrorMessage";
 import { MiniMarkdown } from "./MiniMarkdown";
+import { StatusIndicator } from "./StatusIndicator";
 import { ToolResultCard } from "./ToolResultCard";
 
 /** Copy-to-clipboard for one chat message (user prompt or assistant reply). */
@@ -49,6 +50,7 @@ const AUTO_SCROLL_THRESHOLD_PX = 120;
 export interface TranscriptProps {
   items: TranscriptItem[];
   liveStatus: string;
+  showStatusIndicator: boolean;
   sessionId: string | null;
   widgetInitTimeoutMs: number;
   onApprove: (callId: string, decision: ApprovalDecision) => void;
@@ -58,7 +60,7 @@ export interface TranscriptProps {
 }
 
 export function Transcript(props: TranscriptProps) {
-  const { items, liveStatus, sessionId, widgetInitTimeoutMs, onApprove, onWidgetMessage, onHostNotice, onSuggestion } = props;
+  const { items, liveStatus, showStatusIndicator, sessionId, widgetInitTimeoutMs, onApprove, onWidgetMessage, onHostNotice, onSuggestion } = props;
   const scrollRef = useRef<HTMLDivElement | null>(null);
   const stickToBottomRef = useRef(true);
 
@@ -137,6 +139,7 @@ export function Transcript(props: TranscriptProps) {
           </li>
         ))}
       </ul>
+      {showStatusIndicator && liveStatus && <StatusIndicator label={liveStatus} />}
       <div className="assistant-live-status" aria-live="polite">
         {liveStatus}
       </div>
