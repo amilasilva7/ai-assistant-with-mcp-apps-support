@@ -8,7 +8,7 @@
  * `turn_end` always arrives last; any tool call still pending at that point is
  * marked `cancelled` so its `WidgetFrame` gets `sendToolCancelled`.
  */
-import type { ContentBlockLike, ModelCallPhase, StopReason, Trust, TurnEvent } from "./api";
+import type { ContentBlockLike, LlmMessageLike, ModelCallPhase, StopReason, Trust, TurnEvent } from "./api";
 
 export interface UserItem {
   kind: "user";
@@ -87,14 +87,78 @@ export type Action =
   | { type: "submit_prompt"; text: string; source: "user" | "app" }
   | { type: "turn_event"; event: TurnEvent }
   | { type: "turn_failed"; message: string }
-  | { type: "host_notice"; level: "info" | "warn"; message: string };
+  | { type: "host_notice"; level: "info" | "warn"; message: string }
+  | { type: "load_chat"; items: TranscriptItem[] }
+  | { type: "reset" };
 
 function newId(): string {
   return crypto.randomUUID();
 }
 
+/**
+ * Rebuilds a read-only-ish transcript from a persisted chat's raw
+ * LlmMessage[] (assistant/history.ts's on-disk format) when it's reopened.
+ * This is necessarily a simplification, not a byte-for-byte replay of the
+ * live event stream: a tool_result block only carries the flattened text
+ * that was actually sent back to the model (loop.ts's `truncateToolResultForModel`
+ * + banner), not the original content-block array/structuredContent/duration
+ * — so a reopened tool card shows text only, never re-attempts its widget
+ * (no resourceUri survives), and its "Technical details" section is the
+ * closest available proxy for the original request/response.
+ */
+export function messagesToTranscript(messages: LlmMessageLike[]): TranscriptItem[] {
+  const items: TranscriptItem[] = [];
+
+  for (const message of messages) {
+    if (message.role === "user") {
+      for (const block of message.content) {
+        if (block.type === "text") {
+          // Widget-context banners (session.ts's drainModelContext, injected
+          // ahead of the user's own text by loop.ts) are model input, not
+          // something the user typed — never shown as a chat bubble.
+          if (block.text.startsWith("[widget state")) continue;
+          items.push({ kind: "user", id: newId(), text: block.text, source: "user" });
+        } else {
+          const idx = items.findIndex((it) => it.kind === "tool_call" && it.callId === block.toolUseId);
+          if (idx < 0) continue;
+          const text = block.text.replace(/^\[(?:un)?trusted tool output[^\n]*\n/, "").replace(/^\[tool output[^\n]*\n/, "");
+          items[idx] = {
+            ...(items[idx] as ToolCallItem),
+            result: { durationMs: 0, truncated: false, content: [{ type: "text", text }], isError: block.isError },
+          };
+        }
+      }
+    } else {
+      for (const block of message.content) {
+        if (block.type === "text") {
+          items.push({ kind: "assistant_text", id: newId(), text: block.text, streaming: false });
+        } else {
+          items.push({
+            kind: "tool_call",
+            id: block.id,
+            callId: block.id,
+            alias: block.name,
+            serverId: "",
+            serverName: "",
+            toolName: block.name,
+            trust: "user",
+            mountable: false,
+            approvalPending: false,
+            input: block.input,
+          });
+        }
+      }
+    }
+  }
+  return items;
+}
+
 export function reducer(state: AppState, action: Action): AppState {
   switch (action.type) {
+    case "load_chat":
+      return { ...initialState, transcript: action.items };
+    case "reset":
+      return initialState;
     case "submit_prompt": {
       const userItem: UserItem = { kind: "user", id: newId(), text: action.text, source: action.source };
       return {
