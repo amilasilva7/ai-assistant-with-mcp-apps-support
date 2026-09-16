@@ -13,6 +13,7 @@ import { useEffect, useReducer, useRef, useState } from "react";
 import * as api from "./api";
 import { ChatConflictError } from "./api";
 import { Composer } from "./components/Composer";
+import { ModelSwitcher } from "./components/ModelSwitcher";
 import { PanelSection } from "./components/PanelSection";
 import { ServersPanel } from "./components/ServersPanel";
 import { Transcript } from "./components/Transcript";
@@ -128,6 +129,7 @@ export function App() {
             onSuggestion={handleSubmit}
           />
           <Composer disabled={!sessionId || state.turnActive} turnActive={state.turnActive} onSubmit={handleSubmit} onCancel={handleCancel} />
+          <ModelSwitcher />
         </main>
 
         {panelOpen && (

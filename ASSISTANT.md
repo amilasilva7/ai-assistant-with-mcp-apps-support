@@ -46,8 +46,17 @@ documented; `.env` is gitignored — that's where real keys belong, never in
 
 Set `ASSISTANT_LLM_PROVIDER` in `.env` to one of `anthropic` (default),
 `gemini`, `ollama`, or `bedrock`. Only the selected provider's key is
-required — this runs one provider at a time, not a fallback chain. Restart
-`npm run assistant` after changing it.
+required at boot — this runs one provider at a time, not a fallback chain.
+
+**At runtime**, without a restart: the "Model" row right under the chat box
+in the UI lets you switch provider and model on the fly. It only offers a
+provider whose key is already in `.env` (e.g. if both `ANTHROPIC_API_KEY`
+and `GEMINI_API_KEY` are set, you can flip between Claude and Gemini
+mid-session; a provider with no key set shows as "not configured" instead of
+erroring after the fact). Pick "Custom model…" to type any model id,
+including one this UI doesn't list yet. There's no field to paste in a new
+API key from the browser — add it to `.env` and restart once to make a new
+provider selectable.
 
 ### Anthropic (default)
 

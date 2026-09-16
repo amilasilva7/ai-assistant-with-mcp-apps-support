@@ -12,16 +12,13 @@ import type { NextFunction, Request, Response } from "express";
 import { loadConfig } from "./config.js";
 import { initLogging, logError } from "./log.js";
 import { ServerRegistry } from "./registry.js";
-import { AnthropicProvider } from "./llm/anthropic.js";
-import { BedrockProvider } from "./llm/bedrock.js";
-import { GeminiProvider } from "./llm/gemini.js";
-import { OllamaProvider } from "./llm/ollama.js";
-import type { LlmProvider } from "./llm/provider.js";
+import { LlmManager } from "./llm/manager.js";
 import { SessionStore } from "./session.js";
 import { createChatRouter } from "./routes/chat.js";
 import { createServersRouter } from "./routes/servers.js";
 import { createMcpRouter } from "./routes/mcp.js";
 import { createEventsRouter } from "./routes/events.js";
+import { createLlmRouter } from "./routes/llm.js";
 
 const ROOT_DIR = path.join(import.meta.dirname, "..");
 const SPA_DIR = path.join(ROOT_DIR, "dist", "assistant");
@@ -98,14 +95,7 @@ async function main() {
     }
   }
 
-  const llm: LlmProvider =
-    config.llmProvider === "gemini"
-      ? new GeminiProvider(config.geminiApiKey, config.model, config.maxOutputTokens)
-      : config.llmProvider === "ollama"
-        ? new OllamaProvider(config.ollamaBaseUrl, config.model)
-        : config.llmProvider === "bedrock"
-          ? new BedrockProvider(config.awsRegion, config.model, config.maxOutputTokens)
-          : new AnthropicProvider(config.anthropicApiKey, config.model, config.maxOutputTokens);
+  const llmManager = new LlmManager(config);
   console.log(`[main] LLM provider: ${config.llmProvider} (${config.model})`);
   const sessions = new SessionStore();
 
@@ -154,8 +144,10 @@ async function main() {
   });
 
   app.get("/api/config", (_req, res) => {
+    const current = llmManager.getCurrent();
     res.json({
-      model: config.model,
+      model: current.model,
+      llmProvider: current.provider,
       widgetInitTimeoutMs: config.widgetInitTimeoutMs,
       maxToolIterations: config.maxToolIterations,
       buildWarnings,
@@ -167,10 +159,11 @@ async function main() {
     res.json({ sessionId: session.id });
   });
 
-  app.use("/api", createChatRouter({ sessions, registry, llm, config }));
+  app.use("/api", createChatRouter({ sessions, registry, llm: llmManager, config }));
   app.use("/api", createServersRouter(registry));
   app.use("/api", createMcpRouter({ sessions, registry, config }));
   app.use("/api", createEventsRouter(registry));
+  app.use("/api", createLlmRouter(llmManager));
 
   app.use(express.static(SPA_DIR));
   // Express 5's router (path-to-regexp v6+) rejects a bare "*" wildcard; a

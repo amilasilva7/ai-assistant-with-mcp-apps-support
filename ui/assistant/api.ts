@@ -86,6 +86,22 @@ export interface PublicServerRecord {
   }>;
 }
 
+export type LlmProviderId = "anthropic" | "gemini" | "ollama" | "bedrock";
+
+export interface LlmProviderInfo {
+  id: LlmProviderId;
+  label: string;
+  configured: boolean;
+  reason?: string;
+  defaultModel: string;
+  suggestedModels: string[];
+}
+
+export interface LlmState {
+  provider: LlmProviderId;
+  model: string;
+}
+
 async function asJson<T>(res: Response): Promise<T> {
   if (!res.ok) {
     let body: unknown;
@@ -107,9 +123,30 @@ export async function createSession(): Promise<string> {
   return sessionId;
 }
 
-export async function getConfig(): Promise<{ model: string; widgetInitTimeoutMs: number; maxToolIterations: number; buildWarnings: string[] }> {
+export async function getConfig(): Promise<{ model: string; llmProvider: LlmProviderId; widgetInitTimeoutMs: number; maxToolIterations: number; buildWarnings: string[] }> {
   const res = await fetch("/api/config");
   return asJson(res);
+}
+
+export async function getLlmSettings(): Promise<{ current: LlmState; providers: LlmProviderInfo[] }> {
+  const res = await fetch("/api/llm");
+  return asJson(res);
+}
+
+export async function setLlmSettings(provider: LlmProviderId, model?: string): Promise<LlmState> {
+  const res = await fetch("/api/llm", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ provider, model }),
+  });
+  const { current } = await asJson<{ current: LlmState }>(res);
+  return current;
+}
+
+export async function getOllamaModels(): Promise<string[]> {
+  const res = await fetch("/api/llm/ollama-models");
+  const { models } = await asJson<{ models: string[] }>(res);
+  return models;
 }
 
 export async function listServers(): Promise<PublicServerRecord[]> {
