@@ -17,7 +17,7 @@ import { OllamaApiError } from "./llm/ollama.js";
 import type { LlmAssistantBlock, LlmProvider, LlmUserBlock } from "./llm/provider.js";
 import { RegistryError, type ServerRegistry } from "./registry.js";
 import { drainModelContext, newWidgetBinding } from "./session.js";
-import { coerceToolArgs, modelFacingTools, snapshotToolRouting, type ToolRoute } from "./tools.js";
+import { coerceToolArgs, modelFacingTools, snapshotToolRouting, summarizeRequiredParams, type ToolRoute } from "./tools.js";
 import { truncateToolResultForModel } from "./truncate.js";
 import type { ApprovalDecision, ServerRecord, Session } from "./types.js";
 import { trimHistory } from "./session.js";
@@ -64,30 +64,72 @@ function classifyLlmError(err: unknown): { code: ErrorCode; message: string } {
   return { code: "LLM_ERROR", message: errMessage(err) };
 }
 
-function buildSystemPrompt(servers: ServerRecord[]): string {
+/**
+ * A readable tool catalog — server, alias, name/title, description, and
+ * required parameters — laid out as prompt text rather than left implicit in
+ * the function-calling `tools` array. The API-level tool defs (built by
+ * `modelFacingTools`) are what the model ultimately calls, but restating the
+ * same facts here as prose measurably helps tool *selection*, especially for
+ * smaller/local models (Ollama) that attend to system-prompt text more
+ * reliably than to a long list of JSON Schemas. Domain-agnostic on purpose:
+ * this runs against whatever servers happen to be connected (the seeded
+ * health-insurance server, a user-added one, both, or neither — see
+ * ASSISTANT.md's "Adding MCP servers"), so it must never assume a fixed
+ * domain or a specific tool name exists.
+ */
+function buildToolCatalog(servers: ServerRecord[]): string {
   const connected = servers.filter((s) => s.enabled && s.status === "connected");
-  const inventory = connected
-    .map((s) => `- ${s.name}${s.trust === "user" ? " (user-added, untrusted)" : ""}: ${s.tools.filter((t) => t.offeredToModel).length} tool(s)`)
-    .join("\n");
+  if (connected.length === 0) return "No MCP servers are currently connected — you have no tools to call.";
+  const sections = connected.map((s) => {
+    const tools = s.tools.filter((t) => t.offeredToModel);
+    const label = `${s.name}${s.trust === "user" ? " (user-added, untrusted)" : ""}`;
+    if (tools.length === 0) return `- ${label}: no tools offered to you`;
+    const lines = tools.map((t) => {
+      const name = t.title && t.title !== t.name ? `${t.name} ("${t.title}")` : t.name;
+      const required = summarizeRequiredParams(t.inputSchema);
+      const desc = (t.description ?? "").split("\n")[0].trim();
+      return `  * ${t.alias} — ${name}: ${desc || "(no description given)"} [${required ? `requires: ${required}` : "no required parameters"}]`;
+    });
+    return `- ${label}:\n${lines.join("\n")}`;
+  });
+  return `Tool catalog — every tool you can currently call, grouped by server:\n${sections.join("\n")}`;
+}
+
+function buildSystemPrompt(servers: ServerRecord[]): string {
   return [
-    "You are the AI assistant embedded in the income-mcp health insurance demo. " +
-      "You can call tools exposed by connected MCP servers to answer questions about health insurance " +
-      "plans; some tools render an interactive widget for the user in addition to your text reply.",
-    inventory ? `Connected servers:\n${inventory}` : "No MCP servers are currently connected.",
-    "Tool-first policy — follow these rules in order, every turn:\n" +
-      "1. You have no real product, pricing, or plan data of your own. If the question could be about " +
-      "real plans (availability, coverage, pricing, comparisons, quotations), you MUST call a tool. " +
-      "Never answer from general knowledge, and never guess at data instead of calling a tool.\n" +
-      "2. Pick the tool whose name/description best matches the request.\n" +
-      "3. Build the tool's arguments ONLY from filters the user actually stated (budget, age, category, " +
-      "coverage type, etc). Never copy the user's raw question text into a query/keyword argument.\n" +
-      "4. For a broad or vague request (e.g. 'what plans are available', 'show me health plans'), call " +
-      "search_products with NO arguments at all — an empty {} — to list everything. Do not put the " +
-      "user's wording into the query field; that turns a broad request into an empty result.\n" +
-      "5. Never ask the user a clarifying question before trying a tool call — call the tool first, " +
-      "then narrow down from its results if needed.\n" +
-      "6. Skip tool calls only for greetings, small talk, or purely conceptual questions no tool covers " +
-      "(e.g. 'what does co-pay mean').",
+    "You are an AI assistant that answers the user's questions by calling tools exposed by whichever " +
+      "MCP servers are currently connected. The set of servers and tools varies by deployment and can " +
+      "change between turns — always work from the tool catalog below, never from assumptions about what " +
+      "domain or tools might be connected. Some tools render an interactive widget for the user in " +
+      "addition to your text reply.",
+    buildToolCatalog(servers),
+    "Tool-selection policy — follow these rules in order, every turn:\n" +
+      "1. You have no real data of your own (no product, pricing, availability, account, or record data). " +
+      "If the question could be answered by a tool in the catalog, you MUST call it. Never answer from " +
+      "general knowledge, and never guess at data a tool would provide.\n" +
+      "2. Read every tool's name, title, and description in the catalog before picking one. Choose the " +
+      "SINGLE tool whose description most specifically matches what the user is asking — not just the " +
+      "first plausible match. Each tool's alias is prefixed with the server it belongs to (the part " +
+      "before \"__\"); when two servers expose similarly-named tools, use that prefix plus the server " +
+      "list above to pick the one whose server actually matches the question's domain.\n" +
+      "3. If several tools could plausibly apply, prefer the most specific one over a general " +
+      "listing/search tool; if nothing is specific enough, fall back to the broadest matching tool rather " +
+      "than asking the user which one they meant.\n" +
+      "4. Before calling, check the tool's [requires: ...] list. Build arguments ONLY from filters the " +
+      "user actually stated (e.g. budget, age, category, region, date range) — never invent a value for a " +
+      "required field the user never mentioned, and never copy the user's raw question text into a " +
+      "query/keyword argument.\n" +
+      "5. For a broad or vague request that a tool can answer with no filters at all (e.g. 'what plans " +
+      "are available', 'show me your products'), call that tool with an empty arguments object ({}) " +
+      "rather than guessing filter values — putting the user's wording into a filter field usually turns " +
+      "a broad request into an empty result.\n" +
+      "6. Never ask the user a clarifying question before trying a tool call — call the closest-matching " +
+      "tool first, then narrow down from its results or ask a targeted follow-up only if it's still " +
+      "missing something a required parameter needs.\n" +
+      "7. Skip tool calls only for greetings, small talk, or purely conceptual questions no tool in the " +
+      "catalog covers (e.g. 'what does co-pay mean').\n" +
+      "8. Only call a tool that is actually listed in the catalog above, by its exact alias. If nothing in " +
+      "the catalog covers the request, say so plainly instead of inventing a tool call.",
     "Tool-error policy — a tool call failing is normal, not a problem to report. When a tool call " +
       "fails, follow these rules instead of relaying the failure:\n" +
       "1. If the failure is because required information is missing or invalid (e.g. a validation " +
